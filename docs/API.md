@@ -1,0 +1,22 @@
+# API overview
+
+Base path: `/api/v1`
+
+- `GET /dashboard?classId=`
+- `GET /classes`
+- `GET /students?classId=&q=&page=&size=`
+- `GET /students/{id}`
+- `GET /students/{id}/transactions?page=&size=`
+- `POST /students/{id}/stars/adjustments`
+
+Mutation requests require `Idempotency-Key` header.
+
+Example:
+```json
+{
+  "classId": "00000000-0000-0000-0000-000000000101",
+  "stars": -1,
+  "reasonCode": "LATE_OVER_15_MINUTES",
+  "reasonDetail": "Đến lớp lúc 07:48"
+}
+```
