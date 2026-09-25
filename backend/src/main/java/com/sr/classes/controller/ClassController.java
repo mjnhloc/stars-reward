@@ -12,7 +12,7 @@ import com.sr.classes.service.ClassService;
 @RestController
 @RequestMapping("/api/v1/classes")
 public class ClassController {
-    
+
     private final ClassService classService;
 
     public ClassController(ClassService classService) {

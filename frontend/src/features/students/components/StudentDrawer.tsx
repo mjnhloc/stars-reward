@@ -1,7 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import { api } from "../lib/api";
-import type { Student, Transaction } from "../types";
+
+import { apiClient } from "../../../lib/apiClient";
+
+import type { Transaction } from "../../star-transactions/types/star-transaction.types";
+import type { Student } from "../types/student.types";
+
+const money = (v: number) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
+
 export function StudentDrawer({
     student,
     onClose,
@@ -13,7 +19,7 @@ export function StudentDrawer({
         queryKey: ["history", student.id],
         queryFn: async () =>
             (
-                await api.get<Transaction[]>(
+                await apiClient.get<Transaction[]>(
                     `/students/${student.id}/transactions`,
                 )
             ).data,
@@ -50,15 +56,15 @@ export function StudentDrawer({
                         <article key={t.id}>
                             <b
                                 className={
-                                    t.star_delta > 0 ? "positive" : "negative"
+                                    t.starDelta > 0 ? "positive" : "negative"
                                 }
                             >
-                                {t.star_delta > 0 ? "+" : ""}
-                                {t.star_delta} sao
+                                {t.starDelta > 0 ? "+" : ""}
+                                {t.starDelta} sao
                             </b>
-                            <p>{t.reason_detail}</p>
+                            <p>{t.reasonDetail}</p>
                             <small>
-                                {new Date(t.created_at).toLocaleString("vi-VN")}{" "}
+                                {new Date(t.createdAt).toLocaleString("vi-VN")}{" "}
                                 · {t.actor}
                             </small>
                         </article>
@@ -68,4 +74,3 @@ export function StudentDrawer({
         </div>
     );
 }
-const money = (v: number) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";

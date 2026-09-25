@@ -1,11 +1,16 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Award, Search, Users, Plus, Minus, Star } from "lucide-react";
-import { api } from "./lib/api";
-import type { ClassSummary, Dashboard, Student } from "./types";
-import { AdjustmentModal } from "./components/AdjustmentModal";
-import { StudentDrawer } from "./components/StudentDrawer";
-export default function App() {
+
+import { apiClient } from "../../../lib/apiClient";
+import { AdjustmentModal } from "../../../features/star-transactions/components/AdjustmentModal";
+import { StudentDrawer } from "../../../features/students/components/StudentDrawer";
+
+import type { ClassSummary } from "../../classes/types/class.types";
+import type { Student } from "../../students/types/student.types";
+import type { Dashboard } from "../types/dashboard.types";
+
+export function DashboardPage() {
     const qc = useQueryClient();
     const [classId, setClassId] = useState("");
     const [search, setSearch] = useState("");
@@ -16,17 +21,19 @@ export default function App() {
     } | null>(null);
     const dashboard = useQuery({
         queryKey: ["dashboard"],
-        queryFn: async () => (await api.get<Dashboard>("/dashboard")).data,
+        queryFn: async () =>
+            (await apiClient.get<Dashboard>("/dashboard")).data,
     });
     const classes = useQuery({
         queryKey: ["classes"],
-        queryFn: async () => (await api.get<ClassSummary[]>("/classes")).data,
+        queryFn: async () =>
+            (await apiClient.get<ClassSummary[]>("/classes")).data,
     });
     const students = useQuery({
         queryKey: ["students", classId],
         queryFn: async () =>
             (
-                await api.get<Student[]>("/students", {
+                await apiClient.get<Student[]>("/students", {
                     params: { classId: classId || undefined },
                 })
             ).data,
@@ -48,7 +55,7 @@ export default function App() {
             detail: string;
         }) =>
             (
-                await api.post(
+                await apiClient.post(
                     `/students/${v.student.id}/stars/adjustments`,
                     {
                         classId: v.student.classId,
@@ -111,7 +118,9 @@ export default function App() {
                         </button>
                         {classes.data?.map((c) => (
                             <button
-                                className={classId === c.classId ? "active" : ""}
+                                className={
+                                    classId === c.classId ? "active" : ""
+                                }
                                 key={c.classId}
                                 onClick={() => setClassId(c.classId)}
                             >

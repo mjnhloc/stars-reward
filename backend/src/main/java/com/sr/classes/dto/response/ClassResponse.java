@@ -7,5 +7,5 @@ public record ClassResponse(
     String classCode,
     String className,
     Integer studentCount,
-    Integer totalStars
-) {} 
+    Integer totalStars) {
+}

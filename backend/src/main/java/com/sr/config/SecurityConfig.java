@@ -21,23 +21,23 @@ public class SecurityConfig {
     UrlBasedCorsConfigurationSource corsConfigurationSource
   ) throws Exception {
     http.csrf(csrf -> csrf.disable())
-        .cors(cors -> cors.configurationSource(corsConfigurationSource))
-        .authorizeHttpRequests(auth -> auth
-          .requestMatchers(HttpMethod.OPTIONS, "/**")
-          .permitAll()
-          .requestMatchers("/actuator/health/**", "/api/**")
-          .permitAll()
-          .anyRequest()
-          .authenticated()
-        );
+      .cors(cors -> cors.configurationSource(corsConfigurationSource))
+      .authorizeHttpRequests(auth -> auth
+        .requestMatchers(HttpMethod.OPTIONS, "/**")
+        .permitAll()
+        .requestMatchers("/actuator/health/**", "/api/**")
+        .permitAll()
+        .anyRequest()
+        .authenticated());
     return http.build();
   }
 
   // @Bean
-  // @ConditionalOnProperty(name = "app.security.enabled", havingValue = "false", matchIfMissing = true)
+  // @ConditionalOnProperty(name = "app.security.enabled", havingValue = "false",
+  // matchIfMissing = true)
   // SecurityFilterChain local(HttpSecurity http) throws Exception {
-  //   return http.csrf(c -> c.disable()).cors(c -> {
-  //   }).authorizeHttpRequests(a -> a.anyRequest().permitAll()).build();
+  // return http.csrf(c -> c.disable()).cors(c -> {
+  // }).authorizeHttpRequests(a -> a.anyRequest().permitAll()).build();
   // }
 
   @Bean
@@ -45,23 +45,21 @@ public class SecurityConfig {
     var c = new CorsConfiguration();
     c.setAllowedOrigins(origins);
 
-    // c.setAllowedOrigins(List.of("http://localhost:5173"));
-
     c.setAllowedMethods(List.of(
-        "GET",
-        "POST",
-        "PUT",
-        "PATCH",
-        "DELETE",
-        "OPTIONS"));
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OPTIONS"));
 
     c.setAllowedHeaders(List.of(
-        "Authorization",
-        "Content-Type",
-        "Idempotency-Key"));
+      "Authorization",
+      "Content-Type",
+      "Idempotency-Key"));
 
     c.setExposedHeaders(List.of(
-        "Location"));
+      "Location"));
 
     var source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", c);

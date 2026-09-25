@@ -58,6 +58,8 @@ public class RewardCalculationServiceImpl implements RewardCalculationService {
 
     @Override 
     public int calculateRemainingStars(int totalStars) {
+        validate(totalStars);
+
         return totalStars % starsPerRedemption;
     }
 
@@ -66,8 +68,8 @@ public class RewardCalculationServiceImpl implements RewardCalculationService {
     public RewardRedemptionResponse redeem(UUID studentId, String idempotencyKey, RewardRedemptionRequest request) {
         int totalStars = jdbcClient.sql("""
             SELECT total_stars
-            FROM student_star_balances s
-            WHERE s.id = :studentId
+            FROM student_star_balances 
+            WHERE student_id = :studentId
             FOR UPDATE
         """)
         .param("studentId", studentId)
@@ -165,7 +167,7 @@ public class RewardCalculationServiceImpl implements RewardCalculationService {
                 :idempotencyKey
             )
         """)
-        .param("id", redemptionId)
+        .param("id", transactionId)
         .param("studentId", studentId)
         .param("classId", classId)
         .param("redemptionId", redemptionId)
@@ -181,16 +183,63 @@ public class RewardCalculationServiceImpl implements RewardCalculationService {
         int updatedRows = jdbcClient.sql("""
             UPDATE student_star_balances
             SET total_stars = :remainingStars,
-                version = version + 1
+                version = version + 1,
+                updated_at = :updatedAt
             WHERE student_id = :studentId        
         """)
         .param("remainingStars", remainingStars)
         .param("studentId", studentId)
+        .param("updatedAt", now)
         .update();
 
         if (updatedRows != 1) {
             throw new IllegalStateException("Không thể cập nhật số sao của học sinh " + studentId);
         }
+
+        String auditDetails = """
+            {
+                "studentId": "%s",
+                "classId": "%s",
+                "transactionId": "%s",
+                "balanceBefore": %d,
+                "starsRedeemed": %d,
+                "balanceAfter": %d,
+                "amountVnd": %d,
+            }
+        """.formatted(
+            studentId,
+            classId,
+            transactionId,
+            totalStars,
+            redeemableStars,
+            remainingStars,
+            redeemableValue
+        );
+
+        // insert log for audit
+        jdbcClient.sql("""
+            INSERT INTO audit_logs (
+                id,
+                actor_id,
+                action,
+                entity_type,
+                entity_id,
+                details
+            )
+            VALUES (
+                :id,
+                :actorId,
+                'REWARD_REDEEEMED',
+                'REWARD_REDEMPTION',
+                :entityId,
+                CAST(:details AS JSONB)
+            )
+        """)
+        .param("id", auditLogId)
+        .param("actorId", userId)
+        .param("entityId", redemptionId)
+        .param("details", auditDetails)
+        .update();
 
         return new RewardRedemptionResponse(redemptionId, studentId, redeemableStars, redeemableValue, remainingStars, "PAID");
     }

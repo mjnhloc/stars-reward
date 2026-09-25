@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import type { Student } from "../types";
+import type { Student } from "../../students/types/student.types";
 type Props = {
     student: Student;
     mode: "add" | "subtract";
@@ -76,8 +76,7 @@ export function AdjustmentModal({
                     <button
                         disabled={
                             busy ||
-                            (mode === "subtract" &&
-                                amount > student.totalStars)
+                            (mode === "subtract" && amount > student.totalStars)
                         }
                     >
                         {busy ? "Đang xử lý..." : "Xác nhận"}
