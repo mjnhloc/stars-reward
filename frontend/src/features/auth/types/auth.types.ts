@@ -2,14 +2,15 @@ export type UserRole = "ADMIN" | "TEACHER" | "VIEWER";
 
 export type AuthUser = {
     id: string;
-    username: string;
+    email: string;
     displayName: string;
     role: UserRole;
 };
 
 export type LoginRequest = {
-    username: string;
+    email: string;
     password: string;
+    remember: boolean;
 };
 
 export type LoginResponse = {

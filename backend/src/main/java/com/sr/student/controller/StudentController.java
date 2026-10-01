@@ -36,9 +36,10 @@ public class StudentController {
     private final RewardCalculationService rewardCalculationService;
 
     public StudentController(
-            StudentService studentService,
-            UserService userService,
-            RewardCalculationService rewardCalculationService) {
+        StudentService studentService,
+        UserService userService,
+        RewardCalculationService rewardCalculationService
+    ) {
         this.studentService = studentService;
         this.userService = userService;
         this.rewardCalculationService = rewardCalculationService;
@@ -46,31 +47,46 @@ public class StudentController {
 
     @GetMapping
     public List<StudentResponse> getStudents(
-            @RequestParam(required = false) UUID classId,
-            @RequestParam(defaultValue = "") String query) {
+        @RequestParam(required = false)
+        UUID classId,
+        @RequestParam(defaultValue = "")
+        String query
+    ) {
         return studentService.getStudents(classId, query);
     }
 
     @GetMapping("/{studentId}/transactions")
     public List<StudentTransactionResponse> getStudentTransactions(
-            @PathVariable UUID studentId) {
+        @PathVariable
+        UUID studentId
+    ) {
         return studentService.getStudentTransactions(studentId);
     }
 
     @PostMapping("/{studentId}/stars/adjustments")
     @ResponseStatus(HttpStatus.CREATED)
     public StudentStarsAdjustmentResponse adjustStudentStars(
-            @PathVariable UUID studentId,
-            @RequestHeader("Idempotency-Key") String key,
-            @Valid @RequestBody StudentStarsAdjustmentRequest request) {
+        @PathVariable
+        UUID studentId,
+        @RequestHeader("Idempotency-Key")
+        String key,
+        @Valid
+        @RequestBody
+        StudentStarsAdjustmentRequest request
+    ) {
         return studentService.adjustStudentStars(userService.getUserId(), studentId, request, key);
     }
 
     @PostMapping("/{studentId}/redemptions")
     public RewardRedemptionResponse redeemReward(
-            @PathVariable UUID studentId,
-            @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @Valid @RequestBody RewardRedemptionRequest redemptionRequest) {
+        @PathVariable
+        UUID studentId,
+        @RequestHeader("Idempotency-Key")
+        String idempotencyKey,
+        @Valid
+        @RequestBody
+        RewardRedemptionRequest redemptionRequest
+    ) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new IllegalArgumentException("Idempotency-Key không được trống");
         }

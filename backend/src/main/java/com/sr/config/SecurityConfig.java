@@ -2,11 +2,17 @@ package com.sr.config;
 
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -22,47 +28,72 @@ public class SecurityConfig {
   ) throws Exception {
     http.csrf(csrf -> csrf.disable())
       .cors(cors -> cors.configurationSource(corsConfigurationSource))
-      .authorizeHttpRequests(auth -> auth
-        .requestMatchers(HttpMethod.OPTIONS, "/**")
-        .permitAll()
-        .requestMatchers("/actuator/health/**", "/api/**")
-        .permitAll()
-        .anyRequest()
-        .authenticated());
+      .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+      .authorizeHttpRequests(
+        auth -> auth
+          .requestMatchers(HttpMethod.OPTIONS, "/**")
+          .permitAll()
+
+          .requestMatchers("/actuator/health/**", "/api/v1/auth/login")
+          .permitAll()
+
+          .requestMatchers("/api/v1/**")
+          .authenticated()
+
+          .anyRequest()
+          .denyAll()
+      )
+      .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+
     return http.build();
   }
 
-  // @Bean
-  // @ConditionalOnProperty(name = "app.security.enabled", havingValue = "false",
-  // matchIfMissing = true)
-  // SecurityFilterChain local(HttpSecurity http) throws Exception {
-  // return http.csrf(c -> c.disable()).cors(c -> {
-  // }).authorizeHttpRequests(a -> a.anyRequest().permitAll()).build();
-  // }
+  @Bean
+  public Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter() {
+    JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
+
+    authoritiesConverter.setAuthoritiesClaimName("role");
+    authoritiesConverter.setAuthorityPrefix("ROLE_");
+
+    JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+
+    converter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
+
+    return converter;
+  }
 
   @Bean
-  UrlBasedCorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins}") List<String> origins) {
-    var c = new CorsConfiguration();
-    c.setAllowedOrigins(origins);
+  UrlBasedCorsConfigurationSource corsConfigurationSource(
+    @Value("${app.cors.allowed-origins}")
+    List<String> origins
+  ) {
+    CorsConfiguration configuration = new CorsConfiguration();
+    configuration.setAllowedOrigins(origins);
 
-    c.setAllowedMethods(List.of(
-      "GET",
-      "POST",
-      "PUT",
-      "PATCH",
-      "DELETE",
-      "OPTIONS"));
+    configuration.setAllowedMethods(
+      List.of(
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "OPTIONS"
+      )
+    );
 
-    c.setAllowedHeaders(List.of(
-      "Authorization",
-      "Content-Type",
-      "Idempotency-Key"));
+    configuration.setAllowedHeaders(
+      List.of(
+        "Authorization",
+        "Content-Type",
+        "Idempotency-Key"
+      )
+    );
 
-    c.setExposedHeaders(List.of(
-      "Location"));
+    configuration.setAllowCredentials(true);
+    configuration.setMaxAge(3600L);
 
-    var source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", c);
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", configuration);
 
     return source;
   }

@@ -1,11 +1,5 @@
 import { useState, type SubmitEvent } from "react";
-import {
-    Eye,
-    EyeOff,
-    LoaderCircle,
-    LockKeyhole,
-    UserRound,
-} from "lucide-react";
+import { Eye, EyeOff, LoaderCircle, LockKeyhole, Mail } from "lucide-react";
 
 import { useLocation, useNavigate } from "react-router-dom";
 import { useLogin } from "../hooks/useLogin";
@@ -24,7 +18,7 @@ export function LoginForm() {
     const { setAuthenticatedUser } = useAuth();
     const loginMutation = useLogin();
 
-    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [remember, setRememeber] = useState(true);
     const [showPassword, setShowPassword] = useState(false);
@@ -34,9 +28,9 @@ export function LoginForm() {
     async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
         event.preventDefault();
 
-        const normalizedUsername = username.trim();
+        const normalizedEmail = email.trim().toLowerCase();
 
-        if (!normalizedUsername || !password) {
+        if (!normalizedEmail || !password) {
             setValidationError("Vui lòng nhập đầy đủ tài khoản và mật khẩu");
             return;
         }
@@ -45,10 +39,8 @@ export function LoginForm() {
 
         try {
             const result = await loginMutation.mutateAsync({
-                credentials: {
-                    username: normalizedUsername,
-                    password,
-                },
+                email: normalizedEmail,
+                password,
                 remember,
             });
 
@@ -70,13 +62,14 @@ export function LoginForm() {
                 <span>Tài khoản</span>
 
                 <div className="input-container">
-                    <UserRound aria-hidden="true" />
+                    <Mail aria-hidden="true" />
 
                     <input
-                        value={username}
-                        onChange={(event) => setUsername(event.target.value)}
-                        autoComplete="username"
-                        placeholder="Nhập tài khoản"
+                        type="email"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        autoComplete="email"
+                        placeholder="Nhập email"
                         disabled={loginMutation.isPending}
                     />
                 </div>

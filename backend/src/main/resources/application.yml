@@ -1,40 +1,41 @@
 spring:
-  application.name: stars-reward-backend
-  datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/stars-reward}
-    username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_PASSWORD:root}
-    hikari:
-      maximum-pool-size: 20
-      minimum-idle: 2
-      connection-timeout: 30000
-  flyway:
-    enabled: true
-  jackson:
-    time-zone: Asia/Ho_Chi_Minh
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${JWT_ISSUER_URI:https://invalid.local/issuer}
-          jwk-set-uri: ${JWT_JWK_SET_URI:https://invalid.local/jwks}
-server:
-  port: 8080
-  shutdown: graceful
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,prometheus
-  endpoint:
-    health:
-      probes:
+    config:
+        import:
+            - file:../.env[.properties]
+    application.name: stars-reward-backend
+    datasource:
+        url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/${POSTGRES_DB}}
+        username: ${SPRING_DATASOURCE_USERNAME:${POSTGRES_USER}}
+        password: ${SPRING_DATASOURCE_PASSWORD:${POSTGRES_PASSWORD}}
+        hikari:
+            maximum-pool-size: 20
+            minimum-idle: 2
+            connection-timeout: 30000
+    flyway:
         enabled: true
+    jackson:
+        time-zone: Asia/Ho_Chi_Minh
+server:
+    port: 8080
+    shutdown: graceful
+management:
+    endpoints:
+        web:
+            exposure:
+                include: health,info,metrics,prometheus
+    endpoint:
+        health:
+            probes:
+                enabled: true
 app:
-  security:
-    enabled: ${APP_SECURITY_ENABLED:false}
-  cors:
-    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
-  rewards:
-    stars-per-redemption: 10
-    vnd-per-redemption: 50000
+    security:
+        enabled: ${APP_SECURITY_ENABLED:false}
+        jwt:
+            access-token-expiration-seconds: 3600
+            issuer: stars-reward
+            secret: ${JWT_SECRET}
+    cors:
+        allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}
+    rewards:
+        stars-per-redemption: 10
+        vnd-per-redemption: 50000

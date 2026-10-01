@@ -76,16 +76,6 @@ export function DashboardPage() {
     });
     return (
         <div>
-            <header>
-                <div className="brand">
-                    <Star fill="currentColor" />{" "}
-                    <div>
-                        <b>Stars reward</b>
-                        <small>Quản lý điểm thưởng học sinh</small>
-                    </div>
-                </div>
-                <span className="role">ADMIN</span>
-            </header>
             <main>
                 <h1>Tổng quan điểm thưởng</h1>
                 <p className="muted">Dữ liệu được lấy từ sổ cái giao dịch</p>
