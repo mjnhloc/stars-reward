@@ -6,10 +6,6 @@ export const tokenStorage = {
         localStorage.removeItem(ACCESS_TOKEN_KEY);
     },
 
-    get(): string | null {
-        return sessionStorage.getItem(ACCESS_TOKEN_KEY);
-    },
-
     set(token: string, remember: boolean): void {
         this.clear();
 

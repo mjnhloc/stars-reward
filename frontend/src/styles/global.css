@@ -23,19 +23,6 @@ button {
     cursor: pointer;
 }
 
-header {
-    height: 68px;
-    background: white;
-    border-bottom: 1px solid #e5eaf1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 max(24px, calc((100vw - 1450px) / 2));
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
 .brand {
     display: flex;
     align-items: center;
@@ -474,4 +461,364 @@ td {
         min-width: 0;
         width: 100%;
     }
+}
+
+/* =========================================
+   Application layout
+   ========================================= */
+
+.app-shell {
+    min-height: 100vh;
+    color: #172033;
+    background: #f6f8fb;
+}
+
+.app-header {
+    height: 68px;
+    background: white;
+    border-bottom: 1px solid #e5eaf1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 max(24px, calc((100vw - 1450px) / 2));
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* =========================================
+   Current user
+   ========================================= */
+
+.header-user {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    gap: 12px;
+}
+
+.header-user > span {
+    display: block;
+    max-width: 220px;
+    overflow: hidden;
+
+    color: #344054;
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.4;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.header-user > span::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+
+    background: #12b76a;
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(18, 183, 106, 0.12);
+}
+
+.logout-button {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    gap: 7px;
+    padding: 0 12px;
+
+    color: #5d6879;
+    background: #ffffff;
+    border: 1px solid #d9e0e9;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 650;
+
+    transition:
+        color 150ms ease,
+        border-color 150ms ease,
+        background-color 150ms ease;
+}
+
+.logout-button svg {
+    width: 15px;
+    height: 15px;
+}
+
+.logout-button:hover {
+    color: #b42318;
+    background: #fff7f6;
+    border-color: #f0b8b3;
+}
+
+.logout-button:focus-visible {
+    outline: 3px solid rgba(245, 184, 46, 0.35);
+    outline-offset: 2px;
+}
+
+/* =========================================
+   Layout responsive
+   ========================================= */
+
+@media (max-width: 760px) {
+    .header-user {
+        gap: 8px;
+    }
+
+    .header-user > span {
+        max-width: 140px;
+        font-size: 12px;
+    }
+
+    .logout-button span {
+        display: none;
+    }
+
+    .logout-button {
+        width: 38px;
+        height: 38px;
+        padding: 0;
+    }
+
+    .app-page > main {
+        padding: 22px 16px 32px;
+    }
+}
+
+.user-menu {
+    position: relative;
+}
+
+.user-menu-trigger {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 5px 8px;
+
+    color: #344054;
+    background: transparent;
+    border: 0;
+    border-radius: 12px;
+}
+
+.user-menu-trigger:hover {
+    background: #f3f5f8;
+}
+
+.user-avatar {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+
+    color: #7a5200;
+    background: #fff1bd;
+    border-radius: 50%;
+
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.user-menu-name {
+    max-width: 180px;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-menu-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    z-index: 40;
+
+    width: 260px;
+    padding: 8px;
+
+    background: #ffffff;
+    border: 1px solid #e1e7ee;
+    border-radius: 14px;
+    box-shadow: 0 18px 45px rgba(23, 32, 51, 0.15);
+}
+
+.user-menu-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px;
+}
+
+.user-menu-summary strong {
+    color: #344054;
+    font-size: 13px;
+}
+
+.user-menu-summary span {
+    overflow: hidden;
+    color: #7a8495;
+    font-size: 11px;
+    text-overflow: ellipsis;
+}
+
+.user-menu-dropdown > button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px;
+
+    color: #475467;
+    background: transparent;
+    border: 0;
+    border-radius: 9px;
+
+    font-size: 13px;
+    text-align: left;
+}
+
+.user-menu-dropdown > button:hover {
+    background: #f4f6f9;
+}
+
+.user-menu-dropdown svg {
+    width: 16px;
+    height: 16px;
+}
+
+.user-menu-divider {
+    height: 1px;
+    margin: 6px 4px;
+    background: #e8ecf1;
+}
+
+.user-menu-dropdown .user-menu-logout {
+    color: #b42318;
+}
+
+.profile-modal {
+    width: min(560px, calc(100vw - 32px));
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+
+    padding: 24px;
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 25px 70px rgba(23, 32, 51, 0.22);
+}
+
+.profile-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.profile-modal-header h2 {
+    margin: 0;
+    color: #172033;
+    font-size: 20px;
+}
+
+.profile-modal-header p {
+    margin: 5px 0 0;
+    color: #697386;
+    font-size: 13px;
+}
+
+.profile-tabs {
+    display: flex;
+    gap: 4px;
+    margin: 22px 0;
+    padding: 4px;
+
+    background: #f3f5f8;
+    border-radius: 11px;
+}
+
+.profile-tabs button {
+    flex: 1;
+    padding: 9px 14px;
+
+    color: #697386;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+
+    font-size: 13px;
+    font-weight: 650;
+}
+
+.profile-tabs button.active {
+    color: #172033;
+    background: #ffffff;
+    box-shadow: 0 2px 7px rgba(23, 32, 51, 0.08);
+}
+
+.profile-details {
+    display: grid;
+    gap: 12px;
+}
+
+.profile-details > div {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 14px;
+
+    background: #f8fafc;
+    border: 1px solid #edf0f4;
+    border-radius: 12px;
+}
+
+.profile-details span {
+    color: #7a8495;
+    font-size: 12px;
+}
+
+.profile-details strong {
+    color: #344054;
+    font-size: 14px;
+}
+
+.change-password-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.show-password {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    color: #697386;
+    font-size: 13px;
+}
+
+.password-success {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 14px;
+
+    color: #087f5b;
+    background: #ecfdf3;
+    border: 1px solid #abefc6;
+    border-radius: 11px;
+
+    font-size: 13px;
+}
+
+.password-success svg {
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
 }

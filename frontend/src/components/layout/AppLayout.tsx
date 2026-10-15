@@ -1,15 +1,30 @@
-import { Outlet, useNavigate } from "react-router-dom";
 import { Star } from "lucide-react";
+import { useState } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
 
+import { logoutRequest } from "../../features/auth/api/auth.api";
 import { useAuth } from "../../features/auth/hooks/useAuth";
+import { UserMenu } from "../../features/user/components/UserMenu";
+import { UserProfileModal } from "../../features/user/components/UserProfileModal";
 
 export function AppLayout() {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
 
-    function handleLogout() {
-        logout();
-        navigate("/login", { replace: true });
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+    async function handleLogout() {
+        try {
+            await logoutRequest();
+        } finally {
+            logout();
+            navigate("/login", { replace: true });
+        }
+    }
+
+    if (!user) {
+        return null;
     }
 
     return (
@@ -24,16 +39,27 @@ export function AppLayout() {
                     </div>
                 </div>
 
-                <div className="header-user">
-                    <span>{user?.displayName}</span>
-
-                    <button type="button" onClick={handleLogout}>
-                        Đăng xuất
-                    </button>
-                </div>
+                <UserMenu
+                    displayName={user.displayName}
+                    email={user.email}
+                    isOpen={isMenuOpen}
+                    onToggle={() => setIsMenuOpen((value) => !value)}
+                    onProfileClick={() => {
+                        setIsMenuOpen(false);
+                        setIsProfileOpen(true);
+                    }}
+                    onLogout={handleLogout}
+                />
             </header>
 
             <Outlet />
+
+            {isProfileOpen && (
+                <UserProfileModal
+                    user={user}
+                    onClose={() => setIsProfileOpen(false)}
+                />
+            )}
         </div>
     );
 }

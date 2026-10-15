@@ -14,8 +14,10 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sr.auth.dto.request.ChangePasswordRequest;
 import com.sr.auth.dto.request.LoginRequest;
 import com.sr.auth.dto.response.AuthenticatedUserResponse;
+import com.sr.auth.dto.response.ChangePasswordResponse;
 import com.sr.auth.dto.response.LoginResponse;
 import com.sr.auth.service.AuthorizationService;
 import com.sr.user.dto.response.AuthUserResponse;
@@ -42,10 +44,6 @@ public class AuthorizationServiceImpl implements AuthorizationService {
         this.jwtEncoder = jwtEncoder;
         this.accessTokenExpirationSeconds = accessTokenExpirationSeconds;
         this.issuer = issuer;
-    }
-
-    private BadCredentialsException invalidCredentials() {
-        return new BadCredentialsException("Tài khoản hoặc mật khẩu không chính xác");
     }
 
     private void require(UUID user, UUID classId, boolean write) {
@@ -111,11 +109,11 @@ public class AuthorizationServiceImpl implements AuthorizationService {
                 )
             )
             .optional()
-            .orElseThrow(this::invalidCredentials);
+            .orElseThrow(() -> new BadCredentialsException("Tài khoản hoặc mật khẩu không chính xác"));
 
         if (!user.active() || user.passwordHash() == null
             || !passwordEncoder.matches(loginRequest.password(), user.passwordHash())) {
-            throw invalidCredentials();
+            throw new BadCredentialsException("Tài khoản hoặc mật khẩu không chính xác");
         }
 
         long expiresIn = loginRequest.remember() ? accessTokenExpirationSeconds * 24 : accessTokenExpirationSeconds;
@@ -148,5 +146,75 @@ public class AuthorizationServiceImpl implements AuthorizationService {
             expiresIn,
             userResponse
         );
+    }
+
+    @Transactional
+    @Override
+    public ChangePasswordResponse changePassword(UUID userId, ChangePasswordRequest request) {
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new IllegalArgumentException("Xác nhận mật khẩu không khớp.");
+        }
+
+        String currPasswordHash = db.sql("""
+            SELECT password_hash
+            FROM users
+            WHERE id = :userId
+                AND active = TRUE
+            FOR UPDATE
+            """)
+            .param("userId", userId)
+            .query(String.class)
+            .optional()
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng"));
+
+        if (!passwordEncoder.matches(request.currentPassword(), currPasswordHash)) {
+            throw new BadCredentialsException("Mật khẩu hiện tại không chính xác.");
+        }
+
+        if (passwordEncoder.matches(request.newPassword(), currPasswordHash)) {
+            throw new BadCredentialsException("Mật khẩu mới phải khác mật khẩu hiện tại.");
+        }
+
+        String newPasswordHash = passwordEncoder.encode(request.newPassword());
+
+        int updatedRows = db.sql("""
+            UPDATE users
+            SET password_hash = :newPasswordHash,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :userId
+                AND active = TRUE
+            """)
+            .param("newPasswordHash", newPasswordHash)
+            .param("userId", userId)
+            .update();
+
+        if (updatedRows != 1) {
+            throw new IllegalStateException("Không thể cập nhật mật khẩu mới.");
+        }
+
+        db.sql("""
+            INSERT INTO audit_logs (
+                id,
+                actor_id,
+                action,
+                entity_type,
+                entity_id,
+                details
+            )
+            VALUES (
+                :id,
+                :actorId,
+                'PASSWORD_CHANGED',
+                'USER',
+                :userId,
+                CAST('{}' AS JSONB)
+            )
+            """)
+            .param("id", UUID.randomUUID())
+            .param("actorId", userId)
+            .param("userId", userId)
+            .update();
+
+        return new ChangePasswordResponse("Đổi mật khẩu thành công!");
     }
 }

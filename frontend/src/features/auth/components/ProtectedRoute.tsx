@@ -1,7 +1,8 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
-import { useAuth } from "../hooks/useAuth";
 import { LoadingScreen } from "../../../components/ui/LoadingScreen";
+import { useAuth } from "../hooks/useAuth";
+import { tokenStorage } from "../services/tokenStorage";
 
 export function ProtectedRoute() {
     const location = useLocation();
@@ -11,7 +12,9 @@ export function ProtectedRoute() {
         return <LoadingScreen />;
     }
 
-    if (!isAuthenticated) {
+    const token = tokenStorage.getFromAnyStorage();
+
+    if (!isAuthenticated || !token) {
         return (
             <Navigate
                 to="/login"

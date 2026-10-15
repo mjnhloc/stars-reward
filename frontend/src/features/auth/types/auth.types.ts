@@ -19,3 +19,13 @@ export type LoginResponse = {
     expiresIn: number;
     user: AuthUser;
 };
+
+export type ChangePasswordRequest = {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+};
+
+export type ChangePasswordResponse = {
+    message: string;
+};

@@ -1,9 +1,9 @@
-import { useState, type SubmitEvent } from "react";
 import { Eye, EyeOff, LoaderCircle, LockKeyhole, Mail } from "lucide-react";
+import { useState, type SubmitEvent } from "react";
 
 import { useLocation, useNavigate } from "react-router-dom";
-import { useLogin } from "../hooks/useLogin";
 import { useAuth } from "../hooks/useAuth";
+import { useLogin } from "../hooks/useLogin";
 
 type LocationState = {
     from?: {
@@ -113,7 +113,7 @@ export function LoginForm() {
             </label>
 
             {errorMessage && (
-                <div className="login-error" role="alert">
+                <div className="login-error" role="alert" aria-live="polite">
                     {errorMessage}
                 </div>
             )}
