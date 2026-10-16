@@ -4,8 +4,8 @@ import java.util.UUID;
 
 import com.sr.auth.dto.request.ChangePasswordRequest;
 import com.sr.auth.dto.request.LoginRequest;
+import com.sr.auth.dto.response.AuthenticatedUserResponse;
 import com.sr.auth.dto.response.ChangePasswordResponse;
-import com.sr.auth.dto.response.LoginResponse;
 
 public interface AuthorizationService {
 
@@ -13,7 +13,7 @@ public interface AuthorizationService {
 
     void requireAdjust(UUID user, UUID classId);
 
-    LoginResponse login(LoginRequest loginRequest);
+    AuthenticatedUserResponse login(LoginRequest loginRequest);
 
     ChangePasswordResponse changePassword(UUID userId, ChangePasswordRequest request);
 }

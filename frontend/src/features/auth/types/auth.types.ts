@@ -29,3 +29,9 @@ export type ChangePasswordRequest = {
 export type ChangePasswordResponse = {
     message: string;
 };
+
+export type TokenResponse = {
+    accessToken: string;
+    tokenType: string;
+    expiresIn: number;
+};

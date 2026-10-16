@@ -1,10 +1,8 @@
 package com.sr.config;
 
 import java.util.List;
+
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -13,6 +11,9 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -34,7 +35,10 @@ public class SecurityConfig {
           .requestMatchers(HttpMethod.OPTIONS, "/**")
           .permitAll()
 
-          .requestMatchers("/actuator/health/**", "/api/v1/auth/login")
+          .requestMatchers("/api/v1/auth/login", "api/v1/auth/refresh", "api/v1/auth/logout")
+          .permitAll()
+
+          .requestMatchers("/actuator/health/**")
           .permitAll()
 
           .requestMatchers("/api/v1/**")
@@ -49,7 +53,7 @@ public class SecurityConfig {
   }
 
   @Bean
-  public Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter() {
+  Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter() {
     JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
 
     authoritiesConverter.setAuthoritiesClaimName("role");
