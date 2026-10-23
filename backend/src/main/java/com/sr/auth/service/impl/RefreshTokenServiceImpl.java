@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -32,10 +33,15 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     private static final String FAMILY_PREFIX = "refresh-family:";
 
+    private static final String USER_PREFIX = "refresh-user:";
+
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final SecureRandom secureRandom;
-    private final Duration expiration;
+
+    private final Duration sessionExpiration;
+    private final Duration rememberExpiration;
+
     private final String cookieName;
     private final boolean secure;
     private final String sameSite;
@@ -43,65 +49,118 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     public RefreshTokenServiceImpl(
         StringRedisTemplate redisTemplate,
         ObjectMapper objectMapper,
-        @Value("${app.security.refresh-token.expiration-seconds}")
-        long expirationSeconds,
+
+        @Value("${app.security.refresh-token.session-expiration-seconds}")
+        long sessionExpirationSeconds,
+
+        @Value("${app.security.refresh-token.remember-expiration-seconds}")
+        long rememberExpirationSeconds,
+
         @Value("${app.security.refresh-token.cookie-name}")
         String cookieName,
-        @Value("${app.security.refresh-token.secure:false}")
+
+        @Value("${app.security.refresh-token.secure}")
         boolean secure,
+
         @Value("${app.security.refresh-token.same-site}")
         String sameSite
     ) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.secureRandom = new SecureRandom();
-        this.expiration = Duration.ofSeconds(expirationSeconds);
+
+        this.sessionExpiration = Duration.ofSeconds(sessionExpirationSeconds);
+
+        this.rememberExpiration = Duration.ofSeconds(rememberExpirationSeconds);
+
         this.cookieName = cookieName;
         this.secure = secure;
         this.sameSite = sameSite;
     }
 
     @Override
-    public CreatedRefreshToken create(UUID userId, String email, String role) {
-        UUID familyId = UUID.randomUUID();
+    public CreatedRefreshToken create(
+        UUID userId,
+        String email,
+        String role,
+        boolean remember
+    ) {
+        Duration tokenLifetime = remember ? rememberExpiration : sessionExpiration;
 
-        return createToken(userId, email, role, familyId);
+        Instant issuedAt = Instant.now();
+        Instant expiresAt = issuedAt.plus(tokenLifetime);
+
+        return createToken(
+            userId,
+            email,
+            role,
+            UUID.randomUUID(),
+            remember,
+            issuedAt,
+            expiresAt
+        );
     }
 
     @Override
     public CreatedRefreshToken rotate(String refreshToken) {
-        String tokenKey = tokenKey(refreshToken);
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new InvalidRefreshTokenException(
+                "Không tìm thấy refresh token"
+            );
+        }
 
+        String oldTokenKey = tokenKey(refreshToken);
+
+        /*
+         * Lấy session và xóa token cũ trong một operation. Hai request refresh đồng
+         * thời sẽ không thể cùng sử dụng thành công một refresh token.
+         */
         String sessionJson = redisTemplate
             .opsForValue()
-            .get(tokenKey);
+            .getAndDelete(oldTokenKey);
 
         if (sessionJson == null) {
             throw new InvalidRefreshTokenException(
-                "Refresh token không hợp lệ hoặc đã hết hạn"
+                "Refresh token không hợp lệ, đã sử dụng hoặc đã hết hạn"
             );
         }
 
         RefreshTokenSession oldSession = deserialize(sessionJson);
 
-        Boolean deleted = redisTemplate.delete(tokenKey);
+        Instant now = Instant.now();
 
-        if (!Boolean.TRUE.equals(deleted)) {
+        if (!oldSession.expiresAt().isAfter(now)) {
+            removeFromIndexes(
+                oldTokenKey,
+                oldSession
+            );
+
             throw new InvalidRefreshTokenException(
-                "Refresh token đã được sử dụng"
+                "Phiên đăng nhập đã hết hạn"
             );
         }
 
-        CreatedRefreshToken newToken = createToken(
+        /*
+         * Xóa token cũ khỏi các Redis Set index.
+         */
+        removeFromIndexes(
+            oldTokenKey,
+            oldSession
+        );
+
+        /*
+         * Token mới giữ nguyên expiresAt ban đầu. Việc refresh không kéo dài phiên vô
+         * hạn.
+         */
+        return createToken(
             oldSession.userId(),
             oldSession.email(),
             oldSession.role(),
-            oldSession.familyId()
+            oldSession.familyId(),
+            oldSession.remember(),
+            now,
+            oldSession.expiresAt()
         );
-
-        RefreshTokenSession newSession = findRequired(newToken.token());
-
-        return new CreatedRefreshToken(newToken.token(), newSession);
     }
 
     @Override
@@ -112,7 +171,9 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
         String tokenKey = tokenKey(refreshToken);
 
-        String sessionJson = redisTemplate.opsForValue().get(tokenKey);
+        String sessionJson = redisTemplate
+            .opsForValue()
+            .getAndDelete(tokenKey);
 
         if (sessionJson == null) {
             return;
@@ -120,41 +181,108 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
         RefreshTokenSession session = deserialize(sessionJson);
 
-        redisTemplate.delete(tokenKey);
-
-        redisTemplate.opsForSet().remove(
-            familyKey(session.familyId()),
-            tokenKey
-        );
+        removeFromIndexes(tokenKey, session);
     }
 
     @Override
     public void revokeFamily(UUID familyId) {
         String familyKey = familyKey(familyId);
 
-        var tokenKeys = redisTemplate
+        Set<String> tokenKeys = redisTemplate
             .opsForSet()
             .members(familyKey);
 
-        if (tokenKeys != null && !tokenKeys.isEmpty()) {
-            redisTemplate.delete(tokenKeys);
+        if (tokenKeys != null) {
+            for (String tokenKey : tokenKeys) {
+                String sessionJson = redisTemplate
+                    .opsForValue()
+                    .getAndDelete(tokenKey);
+
+                if (sessionJson != null) {
+                    RefreshTokenSession session = deserialize(sessionJson);
+
+                    redisTemplate
+                        .opsForSet()
+                        .remove(
+                            userKey(session.userId()),
+                            tokenKey
+                        );
+                }
+            }
         }
 
         redisTemplate.delete(familyKey);
     }
 
     @Override
-    public void writeToCookie(HttpServletResponse response, String refreshToken) {
-        ResponseCookie cookie = ResponseCookie
+    public void revokeAllByUserId(UUID userId) {
+        String userKey = userKey(userId);
+
+        Set<String> tokenKeys = redisTemplate
+            .opsForSet()
+            .members(userKey);
+
+        if (tokenKeys != null) {
+            for (String tokenKey : tokenKeys) {
+                String sessionJson = redisTemplate
+                    .opsForValue()
+                    .getAndDelete(tokenKey);
+
+                if (sessionJson != null) {
+                    RefreshTokenSession session = deserialize(sessionJson);
+
+                    redisTemplate
+                        .opsForSet()
+                        .remove(
+                            familyKey(session.familyId()),
+                            tokenKey
+                        );
+                }
+            }
+        }
+
+        redisTemplate.delete(userKey);
+    }
+
+    @Override
+    public void writeToCookie(
+        HttpServletResponse response,
+        String refreshToken,
+        boolean remember,
+        Instant expiresAt
+    ) {
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
             .from(cookieName, refreshToken)
             .httpOnly(true)
             .secure(secure)
             .sameSite(sameSite)
-            .path("/api/v1/auth")
-            .maxAge(expiration)
-            .build();
+            .path("/api/v1/auth");
 
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        /*
+         * Có Remember me: tạo persistent cookie với Max-Age.
+         *
+         * Không Remember me: không đặt Max-Age, cookie trở thành browser session
+         * cookie.
+         */
+        if (remember) {
+            Duration remaining = Duration.between(
+                Instant.now(),
+                expiresAt
+            );
+
+            if (remaining.isNegative() || remaining.isZero()) {
+                throw new InvalidRefreshTokenException(
+                    "Refresh session đã hết hạn"
+                );
+            }
+
+            builder.maxAge(remaining);
+        }
+
+        response.addHeader(
+            HttpHeaders.SET_COOKIE,
+            builder.build().toString()
+        );
     }
 
     @Override
@@ -168,19 +296,30 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
             .maxAge(Duration.ZERO)
             .build();
 
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        response.addHeader(
+            HttpHeaders.SET_COOKIE,
+            cookie.toString()
+        );
     }
 
     private CreatedRefreshToken createToken(
         UUID userId,
         String email,
         String role,
-        UUID familyId
+        UUID familyId,
+        boolean remember,
+        Instant issuedAt,
+        Instant expiresAt
     ) {
-        String rawToken = generateSecureToken();
+        Duration remainingTtl = Duration.between(Instant.now(), expiresAt);
 
-        Instant issuedAt = Instant.now();
-        Instant expiresAt = issuedAt.plus(expiration);
+        if (remainingTtl.isNegative() || remainingTtl.isZero()) {
+            throw new InvalidRefreshTokenException(
+                "Không thể tạo refresh token cho phiên đã hết hạn"
+            );
+        }
+
+        String rawToken = generateSecureToken();
 
         RefreshTokenSession session = new RefreshTokenSession(
             UUID.randomUUID(),
@@ -188,17 +327,19 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
             userId,
             email,
             role,
+            remember,
             issuedAt,
             expiresAt
         );
 
         String tokenKey = tokenKey(rawToken);
         String familyKey = familyKey(familyId);
+        String userKey = userKey(userId);
 
         redisTemplate.opsForValue().set(
             tokenKey,
             serialize(session),
-            expiration
+            remainingTtl
         );
 
         redisTemplate.opsForSet().add(
@@ -206,30 +347,46 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
             tokenKey
         );
 
-        redisTemplate.expire(
-            familyKey,
-            expiration
+        redisTemplate.opsForSet().add(
+            userKey,
+            tokenKey
         );
 
-        return new CreatedRefreshToken(rawToken, session);
+        /*
+         * Redis tự xóa các index khi hết TTL. Spring Data Redis hỗ trợ đặt thời gian
+         * hết hạn bằng Duration.
+         */
+        redisTemplate.expire(
+            familyKey,
+            remainingTtl
+        );
+
+        redisTemplate.expire(
+            userKey,
+            remainingTtl
+        );
+
+        return new CreatedRefreshToken(
+            rawToken,
+            session
+        );
     }
 
-    private RefreshTokenSession findRequired(String rawToken) {
-        String json = redisTemplate
-            .opsForValue()
-            .get(tokenKey(rawToken));
+    private void removeFromIndexes(String tokenKey, RefreshTokenSession session) {
+        redisTemplate.opsForSet().remove(
+            familyKey(session.familyId()),
+            tokenKey
+        );
 
-        if (json == null) {
-            throw new IllegalStateException(
-                "Không thể tạo refresh session"
-            );
-        }
-
-        return deserialize(json);
+        redisTemplate.opsForSet().remove(
+            userKey(session.userId()),
+            tokenKey
+        );
     }
 
     private String generateSecureToken() {
         byte[] bytes = new byte[64];
+
         secureRandom.nextBytes(bytes);
 
         return Base64.getUrlEncoder()
@@ -245,9 +402,15 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         return FAMILY_PREFIX + familyId;
     }
 
+    private String userKey(UUID userId) {
+        return USER_PREFIX + userId;
+    }
+
     private String sha256(String value) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            MessageDigest digest = MessageDigest.getInstance(
+                "SHA-256"
+            );
 
             byte[] hash = digest.digest(
                 value.getBytes(
@@ -255,7 +418,8 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                 )
             );
 
-            return HexFormat.of().formatHex(hash);
+            return HexFormat.of()
+                .formatHex(hash);
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException(
                 "SHA-256 không khả dụng",
@@ -264,7 +428,9 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         }
     }
 
-    private String serialize(RefreshTokenSession session) {
+    private String serialize(
+        RefreshTokenSession session
+    ) {
         try {
             return objectMapper.writeValueAsString(
                 session
@@ -277,7 +443,9 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         }
     }
 
-    private RefreshTokenSession deserialize(String json) {
+    private RefreshTokenSession deserialize(
+        String json
+    ) {
         try {
             return objectMapper.readValue(
                 json,

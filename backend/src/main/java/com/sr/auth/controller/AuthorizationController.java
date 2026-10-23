@@ -1,11 +1,12 @@
 package com.sr.auth.controller;
 
+import java.util.Arrays;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -28,6 +29,8 @@ import com.sr.auth.service.RefreshTokenService;
 import com.sr.user.dto.response.AuthUserResponse;
 import com.sr.user.service.UserService;
 
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
@@ -39,17 +42,21 @@ public class AuthorizationController {
     private final UserService userService;
     private final RefreshTokenService refreshTokenService;
     private final AccessTokenService accessTokenService;
+    private final String refreshTokenCookieName;
 
     public AuthorizationController(
         AuthorizationService authorizationService,
         UserService userService,
         RefreshTokenService refreshTokenService,
-        AccessTokenService accessTokenService
+        AccessTokenService accessTokenService,
+        @Value("${app.security.refresh-token.cookie-name}")
+        String refreshTokenCookieName
     ) {
         this.authorizationService = authorizationService;
         this.userService = userService;
         this.refreshTokenService = refreshTokenService;
         this.accessTokenService = accessTokenService;
+        this.refreshTokenCookieName = refreshTokenCookieName;
     }
 
     @GetMapping("/me")
@@ -57,24 +64,37 @@ public class AuthorizationController {
         @AuthenticationPrincipal
         Jwt jwt
     ) {
-        UUID userId = UUID.fromString(jwt.getSubject());
+        UUID userId = extractUserId(jwt);
 
         return userService.getCurrentUser(userId);
     }
 
     @PostMapping("/login")
     public LoginResponse login(
-        @RequestBody
         @Valid
-        LoginRequest loginRequest,
+        @RequestBody
+        LoginRequest request,
         HttpServletResponse response
     ) {
-        AuthenticatedUserResponse user = authorizationService.login(loginRequest);
+        AuthenticatedUserResponse user = authorizationService.login(request);
 
-        CreatedRefreshToken refreshToken = refreshTokenService.create(user.id(), user.email(), user.role());
-        AccessToken accessToken = accessTokenService.create(refreshToken.session());
+        CreatedRefreshToken refreshToken = refreshTokenService.create(
+            user.id(),
+            user.email(),
+            user.role(),
+            request.remember()
+        );
 
-        refreshTokenService.writeToCookie(response, refreshToken.token());
+        AccessToken accessToken = accessTokenService.create(
+            refreshToken.session()
+        );
+
+        refreshTokenService.writeToCookie(
+            response,
+            refreshToken.token(),
+            refreshToken.session().remember(),
+            refreshToken.session().expiresAt()
+        );
 
         AuthUserResponse userResponse = new AuthUserResponse(
             user.id(),
@@ -91,41 +111,33 @@ public class AuthorizationController {
         );
     }
 
-    // revoke refresh token and clear token from cookie
-    // the access token still work for before the expiration
-    @PostMapping("/logout")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void logout(
-        @CookieValue(name = "${app.security.refresh-token.cookie-name}", required = false)
-        String refreshToken, HttpServletResponse response
-    ) {
-        refreshTokenService.revoke(refreshToken);
-        refreshTokenService.clearCookie(response);
-    }
-
-    @PutMapping("/change-password")
-    public ChangePasswordResponse putMethodName(
-        @AuthenticationPrincipal
-        Jwt jwt,
-        @Valid
-        @RequestBody
-        ChangePasswordRequest request
-    ) {
-        UUID userId = UUID.fromString(jwt.getSubject());
-
-        return authorizationService.changePassword(userId, request);
-    }
-
     @PostMapping("/refresh")
     public TokenResponse refresh(
-        @CookieValue(name = "${app.security.refresh-token.cookie-name}")
-        String refreshToken, HttpServletResponse response
+        HttpServletRequest request,
+        HttpServletResponse response
     ) {
-        CreatedRefreshToken rotatedRefreshToken = refreshTokenService.rotate(refreshToken);
+        String currentRefreshToken = findRefreshTokenCookie(request);
 
-        AccessToken accessToken = accessTokenService.create(rotatedRefreshToken.session());
+        if (currentRefreshToken == null || currentRefreshToken.isBlank()) {
+            throw new IllegalArgumentException(
+                "Không tìm thấy refresh token"
+            );
+        }
 
-        refreshTokenService.writeToCookie(response, accessToken.value());
+        CreatedRefreshToken rotatedRefreshToken = refreshTokenService.rotate(
+            currentRefreshToken
+        );
+
+        AccessToken accessToken = accessTokenService.create(
+            rotatedRefreshToken.session()
+        );
+
+        refreshTokenService.writeToCookie(
+            response,
+            rotatedRefreshToken.token(),
+            rotatedRefreshToken.session().remember(),
+            rotatedRefreshToken.session().expiresAt()
+        );
 
         return new TokenResponse(
             accessToken.value(),
@@ -134,4 +146,71 @@ public class AuthorizationController {
         );
     }
 
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(
+        HttpServletRequest request,
+        HttpServletResponse response
+    ) {
+        String refreshToken = findRefreshTokenCookie(request);
+
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            refreshTokenService.revoke(refreshToken);
+        }
+
+        /*
+         * Luôn xóa cookie, kể cả khi Redis key đã hết hạn hoặc token không hợp lệ.
+         */
+        refreshTokenService.clearCookie(response);
+    }
+
+    @PutMapping("/change-password")
+    public ChangePasswordResponse changePassword(
+        @AuthenticationPrincipal
+        Jwt jwt,
+        @Valid
+        @RequestBody
+        ChangePasswordRequest request,
+        HttpServletResponse response
+    ) {
+        UUID userId = extractUserId(jwt);
+
+        ChangePasswordResponse result = authorizationService.changePassword(userId, request);
+
+        /*
+         * Nên thu hồi toàn bộ refresh session sau khi đổi mật khẩu.
+         */
+        refreshTokenService.revokeAllByUserId(userId);
+        refreshTokenService.clearCookie(response);
+
+        return result;
+    }
+
+    private UUID extractUserId(Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null) {
+            throw new IllegalArgumentException(
+                "Access token không chứa user ID"
+            );
+        }
+
+        return UUID.fromString(jwt.getSubject());
+    }
+
+    private String findRefreshTokenCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+
+        if (cookies == null) {
+            return null;
+        }
+
+        return Arrays.stream(cookies)
+            .filter(
+                cookie -> refreshTokenCookieName.equals(
+                    cookie.getName()
+                )
+            )
+            .map(Cookie::getValue)
+            .findFirst()
+            .orElse(null);
+    }
 }

@@ -9,6 +9,7 @@ public record RefreshTokenSession(
     UUID userId,
     String email,
     String role,
+    boolean remember,
     Instant issuedAt,
     Instant expiresAt
 ) {}

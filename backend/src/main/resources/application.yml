@@ -36,11 +36,12 @@ app:
     security:
         enabled: ${APP_SECURITY_ENABLED:false}
         jwt:
-            access-token-expiration-seconds: 900
+            access-token-expiration-seconds: 900 # 15min
             issuer: stars-reward
             secret: ${JWT_SECRET}
         refresh-token:
-            expiration-seconds: 604800
+            session-expiration-seconds: 28800 # 8hrs
+            remember-expiration-seconds: 604800 # 7 days
             cookie-name: stars_reward_refresh_token
             secure: false
             same-site: Strict

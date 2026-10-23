@@ -4,6 +4,7 @@ import type {
     ChangePasswordResponse,
     LoginRequest,
     LoginResponse,
+    TokenResponse,
 } from "../types/auth.types";
 
 import { ChangePasswordRequest } from "../types/auth.types";
@@ -36,4 +37,10 @@ export async function changePassword(
     );
 
     return response.data;
+}
+
+export async function refreshAccessToken(): Promise<string> {
+    const response = await apiClient.post<TokenResponse>("/auth/refresh");
+
+    return response.data.accessToken;
 }

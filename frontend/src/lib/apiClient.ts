@@ -1,17 +1,9 @@
 import axios from "axios";
+import { refreshAccessToken } from "../features/auth/api/auth.api";
 import { tokenStorage } from "../features/auth/services/tokenStorage";
-import { TokenResponse } from "../features/auth/types/auth.types";
 import { toApiError } from "./apiError";
 
 let refreshPromise: Promise<string> | null = null;
-
-async function refreshAccessToken(): Promise<string> {
-    const response = await apiClient.post<TokenResponse>("/auth/refresh");
-
-    tokenStorage.set(response.data.accessToken, false);
-
-    return response.data.accessToken;
-}
 
 export const apiClient = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
@@ -54,6 +46,8 @@ apiClient.interceptors.response.use(
                 });
 
                 const newAccessToken = await refreshPromise;
+
+                tokenStorage.set(newAccessToken, false);
 
                 originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
