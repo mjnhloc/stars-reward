@@ -17,14 +17,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sr.auth.dto.CreatedRefreshToken;
 import com.sr.auth.dto.RefreshTokenSession;
 import com.sr.auth.service.RefreshTokenService;
-import com.sr.exception.InvalidRefreshTokenException;
+import com.sr.common.exception.InvalidRefreshTokenException;
 
 import jakarta.servlet.http.HttpServletResponse;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class RefreshTokenServiceImpl implements RefreshTokenService {
@@ -36,7 +36,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     private static final String USER_PREFIX = "refresh-user:";
 
     private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
     private final SecureRandom secureRandom;
 
     private final Duration sessionExpiration;
@@ -48,7 +48,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     public RefreshTokenServiceImpl(
         StringRedisTemplate redisTemplate,
-        ObjectMapper objectMapper,
+        JsonMapper jsonMapper,
 
         @Value("${app.security.refresh-token.session-expiration-seconds}")
         long sessionExpirationSeconds,
@@ -66,7 +66,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         String sameSite
     ) {
         this.redisTemplate = redisTemplate;
-        this.objectMapper = objectMapper;
+        this.jsonMapper = jsonMapper;
         this.secureRandom = new SecureRandom();
 
         this.sessionExpiration = Duration.ofSeconds(sessionExpirationSeconds);
@@ -432,10 +432,10 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         RefreshTokenSession session
     ) {
         try {
-            return objectMapper.writeValueAsString(
+            return jsonMapper.writeValueAsString(
                 session
             );
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException(
                 "Không thể serialize refresh session",
                 exception
@@ -447,11 +447,11 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         String json
     ) {
         try {
-            return objectMapper.readValue(
+            return jsonMapper.readValue(
                 json,
                 RefreshTokenSession.class
             );
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException(
                 "Refresh session không hợp lệ",
                 exception

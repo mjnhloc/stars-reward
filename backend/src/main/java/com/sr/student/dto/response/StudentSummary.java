@@ -1,6 +1,5 @@
 package com.sr.student.dto.response;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 public record StudentSummary(
@@ -9,8 +8,5 @@ public record StudentSummary(
         String fullName,
         UUID classId,
         String className,
-        BigDecimal homeworkScore,
-        BigDecimal testScore,
-        BigDecimal finalScore,
         int totalStars
 ) {}

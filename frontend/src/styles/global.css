@@ -822,3 +822,147 @@ td {
     width: 17px;
     height: 17px;
 }
+
+.student-drawer {
+    width: min(560px, 100%);
+}
+
+.section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+
+.section-heading h3 {
+    margin: 0;
+    color: #172033;
+    font-size: 16px;
+}
+
+.section-heading p {
+    margin: 4px 0 0;
+    color: #697386;
+    font-size: 12px;
+}
+
+.section-heading > span {
+    flex: 0 0 auto;
+    padding: 5px 9px;
+    color: #697386;
+    background: #f1f4f8;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.score-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.score-item {
+    padding: 15px;
+    background: #ffffff;
+    border: 1px solid #e1e7ee;
+    border-radius: 14px;
+}
+
+.score-item-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 13px;
+}
+
+.score-item-header > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.score-item-header strong {
+    color: #344054;
+    font-size: 14px;
+}
+
+.score-item-header span {
+    color: #7a8495;
+    font-size: 11px;
+}
+
+.score-stars {
+    padding: 5px 9px;
+    color: #8a5c00 !important;
+    background: #fff4cd;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.score-values {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.score-values > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 11px 8px;
+
+    background: #f8fafc;
+    border-radius: 10px;
+}
+
+.score-values span {
+    color: #7a8495;
+    font-size: 11px;
+}
+
+.score-values strong {
+    color: #344054;
+    font-size: 16px;
+}
+
+.score-values .final-score {
+    background: #fff8e6;
+}
+
+.score-values .final-score strong {
+    color: #9a6700;
+}
+
+.empty-state,
+.empty-cell {
+    color: #7a8495;
+    text-align: center;
+}
+
+.empty-state {
+    padding: 24px;
+    background: #f8fafc;
+    border: 1px dashed #d9e0e9;
+    border-radius: 12px;
+    font-size: 13px;
+}
+
+.empty-cell {
+    padding: 32px;
+}
+
+@media (max-width: 480px) {
+    .score-values {
+        grid-template-columns: 1fr;
+    }
+
+    .score-values > div {
+        flex-direction: row;
+        justify-content: space-between;
+    }
+}

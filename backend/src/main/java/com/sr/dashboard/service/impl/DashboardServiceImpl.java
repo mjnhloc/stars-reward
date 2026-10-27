@@ -8,7 +8,7 @@ import com.sr.dashboard.service.DashboardService;
 
 @Service
 public class DashboardServiceImpl implements DashboardService {
-    
+
     private final JdbcClient jdbcClient;
 
     public DashboardServiceImpl(
@@ -19,13 +19,13 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public DashboardResponse getDashboard() {
-        
+
         StringBuilder sql = new StringBuilder("""
-            SELECT
-                COUNT(*) AS total_students,
-                COALESCE(SUM(total_stars), 0) AS total_stars
-            FROM student_star_balances        
-        """);
+                SELECT
+                    COUNT(*) AS total_students,
+                    COALESCE(SUM(total_stars), 0) AS total_stars
+                FROM student_star_balances
+            """);
 
         JdbcClient.StatementSpec statement = jdbcClient.sql(sql.toString());
         return statement.query(DashboardResponse.class).single();

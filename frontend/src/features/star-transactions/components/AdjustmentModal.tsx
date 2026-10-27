@@ -1,13 +1,15 @@
-import { useState } from "react";
 import { X } from "lucide-react";
+import { useState } from "react";
 import type { Student } from "../../students/types/student.types";
+
 type Props = {
     student: Student;
     mode: "add" | "subtract";
     busy: boolean;
     onClose: () => void;
-    onSubmit: (stars: number, reasonCode: string, detail: string) => void;
+    onSubmit: (stars: number, detail: string) => void;
 };
+
 export function AdjustmentModal({
     student,
     mode,
@@ -17,7 +19,6 @@ export function AdjustmentModal({
 }: Props) {
     const [amount, setAmount] = useState(1);
     const [detail, setDetail] = useState("");
-    const code = mode === "subtract" ? "MANUAL_DEDUCTION" : "MANUAL_REWARD";
     const delta = mode === "subtract" ? -amount : amount;
     return (
         <div className="overlay" role="dialog" aria-modal="true">
@@ -25,7 +26,7 @@ export function AdjustmentModal({
                 className="modal"
                 onSubmit={(e) => {
                     e.preventDefault();
-                    onSubmit(delta, code, detail);
+                    onSubmit(delta, detail);
                 }}
             >
                 <div className="row">

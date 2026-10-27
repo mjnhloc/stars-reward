@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Award, Search, Users, Plus, Minus, Star } from "lucide-react";
+import { Award, Minus, Plus, Search, Star, Users } from "lucide-react";
+import { useMemo, useState } from "react";
 
-import { apiClient } from "../../../lib/apiClient";
 import { AdjustmentModal } from "../../../features/star-transactions/components/AdjustmentModal";
 import { StudentDrawer } from "../../../features/students/components/StudentDrawer";
+import { apiClient } from "../../../lib/apiClient";
 
 import type { ClassSummary } from "../../classes/types/class.types";
+import { useStudents } from "../../students/hooks/useStudents";
 import type { Student } from "../../students/types/student.types";
 import type { Dashboard } from "../types/dashboard.types";
 
@@ -15,29 +16,26 @@ export function DashboardPage() {
     const [classId, setClassId] = useState("");
     const [search, setSearch] = useState("");
     const [selected, setSelected] = useState<Student | null>(null);
+
     const [action, setAction] = useState<{
         student: Student;
         mode: "add" | "subtract";
     } | null>(null);
+
     const dashboard = useQuery({
         queryKey: ["dashboard"],
         queryFn: async () =>
             (await apiClient.get<Dashboard>("/dashboard")).data,
     });
+
     const classes = useQuery({
         queryKey: ["classes"],
         queryFn: async () =>
             (await apiClient.get<ClassSummary[]>("/classes")).data,
     });
-    const students = useQuery({
-        queryKey: ["students", classId],
-        queryFn: async () =>
-            (
-                await apiClient.get<Student[]>("/students", {
-                    params: { classId: classId || undefined },
-                })
-            ).data,
-    });
+
+    const students = useStudents(classId || undefined);
+
     const visible = useMemo(
         () =>
             students.data?.filter((s) =>
@@ -47,11 +45,11 @@ export function DashboardPage() {
             ) ?? [],
         [students.data, search],
     );
+
     const mutation = useMutation({
         mutationFn: async (v: {
             student: Student;
             stars: number;
-            reasonCode: string;
             detail: string;
         }) =>
             (
@@ -60,7 +58,6 @@ export function DashboardPage() {
                     {
                         classId: v.student.classId,
                         stars: v.stars,
-                        reasonCode: v.reasonCode,
                         reasonDetail: v.detail,
                     },
                     { headers: { "Idempotency-Key": crypto.randomUUID() } },
@@ -74,11 +71,14 @@ export function DashboardPage() {
         },
         onError: (e) => alert(e.message),
     });
+
     return (
         <div>
             <main>
                 <h1>Tổng quan điểm thưởng</h1>
+
                 <p className="muted">Dữ liệu được lấy từ sổ cái giao dịch</p>
+
                 {dashboard.isLoading ? (
                     <p>Đang tải...</p>
                 ) : dashboard.error ? (
@@ -90,6 +90,7 @@ export function DashboardPage() {
                             label="Tổng học sinh"
                             value={String(dashboard.data?.totalStudents ?? 0)}
                         />
+
                         <Card
                             icon={<Award />}
                             label="Tổng ngôi sao"
@@ -128,8 +129,10 @@ export function DashboardPage() {
                                 <h2>Danh sách học sinh</h2>
                                 <span>{visible.length} kết quả</span>
                             </div>
+
                             <label className="search">
                                 <Search />
+
                                 <input
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
@@ -151,78 +154,137 @@ export function DashboardPage() {
                                             <th>STT</th>
                                             <th>Học sinh</th>
                                             <th>Mã HS</th>
-                                            <th>Điểm BTVN</th>
-                                            <th>Điểm KT</th>
-                                            <th>Điểm tính</th>
                                             <th>Ngôi sao</th>
                                             <th>Giá trị quy đổi</th>
+                                            <th>Số sao có thể đổi</th>
+                                            <th>Số sao còn dư sau khi đổi</th>
                                             <th />
                                         </tr>
                                     </thead>
+
                                     <tbody>
-                                        {visible.map((s, i) => (
-                                            <tr key={s.id}>
-                                                <td>{i + 1}</td>
-                                                <td>
-                                                    <button
-                                                        className="student"
-                                                        onClick={() =>
-                                                            setSelected(s)
-                                                        }
-                                                    >
-                                                        {s.fullName}
-                                                        <small>
-                                                            {s.className}
-                                                        </small>
-                                                    </button>
-                                                </td>
-                                                <td>{s.studentCode}</td>
-                                                <td>
-                                                    {s.homeworkScore ?? "–"}
-                                                </td>
-                                                <td>{s.testScore ?? "–"}</td>
-                                                <td>{s.finalScore ?? "–"}</td>
-                                                <td>
-                                                    <span className="stars">
-                                                        <Star
-                                                            size={14}
-                                                            fill="currentColor"
-                                                        />
-                                                        {s.totalStars}
-                                                    </span>
-                                                </td>
-                                                <td className="money">
-                                                    {money(s.redeemableValue)}
-                                                </td>
-                                                <td>
-                                                    <div className="compact">
-                                                        <button
-                                                            onClick={() =>
-                                                                setAction({
-                                                                    student: s,
-                                                                    mode: "add",
-                                                                })
-                                                            }
-                                                        >
-                                                            <Plus />
-                                                            Cộng
-                                                        </button>
-                                                        <button
-                                                            className="danger"
-                                                            onClick={() =>
-                                                                setAction({
-                                                                    student: s,
-                                                                    mode: "subtract",
-                                                                })
-                                                            }
-                                                        >
-                                                            <Minus />
-                                                            Trừ
-                                                        </button>
-                                                    </div>
+                                        {visible.length === 0 ? (
+                                            <tr>
+                                                <td
+                                                    colSpan={7}
+                                                    className="empty-cell"
+                                                >
+                                                    Không tìm thấy học sinh phù
+                                                    hợp
                                                 </td>
                                             </tr>
-                                        ))}
+                                        ) : (
+                                            visible.map((student, index) => (
+                                                <tr key={student.id}>
+                                                    <td>{index + 1}</td>
+
+                                                    <td>
+                                                        <button
+                                                            type="button"
+                                                            className="student"
+                                                            onClick={() =>
+                                                                setSelected(
+                                                                    student,
+                                                                )
+                                                            }
+                                                        >
+                                                            {student.fullName}
+
+                                                            <small>
+                                                                {
+                                                                    student.className
+                                                                }
+                                                            </small>
+                                                        </button>
+                                                    </td>
+
+                                                    <td>
+                                                        {student.studentCode}
+                                                    </td>
+
+                                                    <td>
+                                                        <span className="stars">
+                                                            <Star
+                                                                size={14}
+                                                                fill="currentColor"
+                                                            />
+
+                                                            {student.totalStars}
+                                                        </span>
+                                                    </td>
+
+                                                    <td className="money">
+                                                        {student.redeemableValue >
+                                                        0
+                                                            ? money(
+                                                                  student.redeemableValue,
+                                                              )
+                                                            : "Chưa đủ 10 sao"}
+                                                    </td>
+
+                                                    <td>
+                                                        <span className="stars">
+                                                            <Star
+                                                                size={14}
+                                                                fill="currentColor"
+                                                            />
+
+                                                            {
+                                                                student.redeemableStars
+                                                            }
+                                                        </span>
+                                                    </td>
+
+                                                    <td>
+                                                        <span className="stars">
+                                                            <Star
+                                                                size={14}
+                                                                fill="currentColor"
+                                                            />
+
+                                                            {
+                                                                student.remainingStars
+                                                            }
+                                                        </span>
+                                                    </td>
+
+                                                    <td>
+                                                        <div className="compact">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setAction({
+                                                                        student,
+                                                                        mode: "add",
+                                                                    })
+                                                                }
+                                                            >
+                                                                <Plus />
+                                                                Cộng
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                className="danger"
+                                                                disabled={
+                                                                    student.totalStars ===
+                                                                    0
+                                                                }
+                                                                onClick={() =>
+                                                                    setAction({
+                                                                        student,
+                                                                        mode: "subtract",
+                                                                    })
+                                                                }
+                                                            >
+                                                                <Minus />
+                                                                Trừ
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -236,11 +298,10 @@ export function DashboardPage() {
                     mode={action.mode}
                     busy={mutation.isPending}
                     onClose={() => setAction(null)}
-                    onSubmit={(stars, reasonCode, detail) =>
+                    onSubmit={(stars, detail) =>
                         mutation.mutate({
                             student: action.student,
                             stars,
-                            reasonCode,
                             detail,
                         })
                     }
@@ -257,6 +318,7 @@ export function DashboardPage() {
         </div>
     );
 }
+
 function Card({
     icon,
     label,
@@ -276,4 +338,5 @@ function Card({
         </article>
     );
 }
+
 const money = (v: number) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
