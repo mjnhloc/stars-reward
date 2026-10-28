@@ -1,14 +1,18 @@
 package com.sr.student.service.impl;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.sr.auth.service.AuthorizationService;
+import com.sr.common.audit.dto.AuditLogCommand;
+import com.sr.common.audit.service.AuditLogService;
 import com.sr.reward.service.RewardCalculationService;
 import com.sr.student.dto.request.StudentStarsAdjustmentRequest;
 import com.sr.student.dto.response.StudentResponse;
@@ -24,15 +28,18 @@ public class StudentServiceImpl implements StudentService {
     private final JdbcClient jdbcClient;
     private final AuthorizationService auth;
     private final RewardCalculationService rewardCalculationService;
+    private final AuditLogService auditLogService;
 
     public StudentServiceImpl(
         JdbcClient jdbcClient,
         AuthorizationService auth,
-        RewardCalculationService rcs
+        RewardCalculationService rcs,
+        AuditLogService auditLogService
     ) {
         this.jdbcClient = jdbcClient;
         this.auth = auth;
         this.rewardCalculationService = rcs;
+        this.auditLogService = auditLogService;
     }
 
     /*
@@ -137,6 +144,7 @@ public class StudentServiceImpl implements StudentService {
      * Function to adjust student stars (add or substract)
      */
     @Override
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public StudentStarsAdjustmentResponse adjustStudentStars(
         UUID actorId,
@@ -161,6 +169,10 @@ public class StudentServiceImpl implements StudentService {
             return existingResult;
         }
 
+        /*
+         * Check if user have right to modify and if student is enroll in the right
+         * class
+         */
         auth.requireAdjust(actorId, request.classId());
 
         boolean enrolled = jdbcClient.sql("""
@@ -203,7 +215,10 @@ public class StudentServiceImpl implements StudentService {
         UUID transactionId = UUID.randomUUID();
         String transactionType = request.stars() > 0 ? "EARN" : "DEDUCT";
 
-        jdbcClient.sql("""
+        /*
+         * insert new star transaction
+         */
+        int insertedTransaction = jdbcClient.sql("""
                 INSERT INTO star_transactions (
                     id,
                     student_id,
@@ -215,7 +230,7 @@ public class StudentServiceImpl implements StudentService {
                     balance_after,
                     reason_detail,
                     performed_by,
-                    idempotency_key,
+                    idempotency_key
                 )
                 VALUES (
                     :transactionId,
@@ -228,7 +243,7 @@ public class StudentServiceImpl implements StudentService {
                     :balanceAfter,
                     :reasonDetail,
                     :performedBy,
-                    :idempotencyKey,
+                    :idempotencyKey
                 )
             """)
             .param("transactionId", transactionId)
@@ -243,6 +258,13 @@ public class StudentServiceImpl implements StudentService {
             .param("idempotencyKey", idempotencyKey)
             .update();
 
+        if (insertedTransaction != 1) {
+            throw new IllegalStateException("Không thể tạo giao dịch thay đổi số sao");
+        }
+
+        /*
+         * update student star balance
+         */
         int updatedRows = jdbcClient.sql("""
                 UPDATE student_star_balances
                 SET total_stars = :balanceAfter,
@@ -261,44 +283,30 @@ public class StudentServiceImpl implements StudentService {
         /*
          * insert adjustment into audit logs
          */
-        jdbcClient.sql("""
-            INSERT INTO audit_logs (
-                id,
-                actor_id,
-                action,
-                entity_type,
-                entity_id,
-                details
-            )
-            VALUES (
-                :id,
-                :actorId,
-                :action,
-                'STAR_TRANSACTION',
-                :transactionId,
-                jsonb_build_object(
-                    'studentId', CAST(:studentId AS TEXT),
-                    'classId', CAST(:classId AS TEXT),
-                    'transactionType', :transactionType,
-                    'starDelta', :starDelta,
-                    'balanceBefore', :balanceBefore,
-                    'balanceAfter', :balanceAfter,
-                    'reasonDetail', :reasonDetail
+        auditLogService.record(
+            new AuditLogCommand(
+                actorId,
+                request.stars() > 0 ? "STARS_ADDED" : "STARS_DEDUCTED",
+                "STAR_TRANSACTION",
+                transactionId,
+                Map.of(
+                    "studentId",
+                    studentId,
+                    "classId",
+                    request.classId(),
+                    "transactionType",
+                    transactionType,
+                    "starDelta",
+                    request.stars(),
+                    "balanceBefore",
+                    balanceBefore,
+                    "balanceAfter",
+                    balanceAfter,
+                    "reasonDetail",
+                    request.reasonDetail()
                 )
             )
-            """)
-            .param("id", UUID.randomUUID())
-            .param("actorId", actorId)
-            .param("action", request.stars() > 0 ? "STARS_ADDED" : "STARS_DEDUCTED")
-            .param("transactionId", transactionId)
-            .param("studentId", studentId)
-            .param("classId", request.classId())
-            .param("transactionType", transactionType)
-            .param("starDelta", request.stars())
-            .param("balanceBefore", balanceBefore)
-            .param("balanceAfter", balanceAfter)
-            .param("reasonDetail", request.reasonDetail())
-            .update();
+        );
 
         return new StudentStarsAdjustmentResponse(transactionId, studentId, request.stars(), balanceAfter);
     }

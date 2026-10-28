@@ -19,15 +19,13 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public DashboardResponse getDashboard() {
-
-        StringBuilder sql = new StringBuilder("""
+        return jdbcClient.sql("""
                 SELECT
                     COUNT(*) AS total_students,
                     COALESCE(SUM(total_stars), 0) AS total_stars
                 FROM student_star_balances
-            """);
-
-        JdbcClient.StatementSpec statement = jdbcClient.sql(sql.toString());
-        return statement.query(DashboardResponse.class).single();
+            """)
+            .query(DashboardResponse.class)
+            .single();
     }
 }

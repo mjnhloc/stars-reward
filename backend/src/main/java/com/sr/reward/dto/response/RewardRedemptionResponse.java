@@ -1,5 +1,6 @@
 package com.sr.reward.dto.response;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 public record RewardRedemptionResponse(
@@ -8,6 +9,6 @@ public record RewardRedemptionResponse(
     int redeemableStars,
     long redeemableValue,
     int remainingStars,
-    String status
-) {
-}
+    String status,
+    OffsetDateTime paidAt
+) {}

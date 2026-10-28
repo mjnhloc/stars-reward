@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sr.reward.dto.request.RewardRedemptionRequest;
 import com.sr.reward.dto.response.RewardRedemptionResponse;
-import com.sr.reward.service.RewardCalculationService;
+import com.sr.reward.service.RewardRedemptionService;
 
 import jakarta.validation.Valid;
 
@@ -19,12 +19,12 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/v1/reward")
 public class RewardController {
 
-    private final RewardCalculationService rewardCalculationService;
+    private final RewardRedemptionService rewardRedemptionService;
 
     public RewardController(
-        RewardCalculationService rewardCalculationService
+        RewardRedemptionService rewardRedemptionService
     ) {
-        this.rewardCalculationService = rewardCalculationService;
+        this.rewardRedemptionService = rewardRedemptionService;
     }
 
     @PostMapping("/{studentId}/redemptions")
@@ -37,10 +37,6 @@ public class RewardController {
         @RequestBody
         RewardRedemptionRequest redemptionRequest
     ) {
-        if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            throw new IllegalArgumentException("Idempotency-Key không được trống");
-        }
-
-        return rewardCalculationService.redeem(studentId, idempotencyKey, redemptionRequest);
+        return rewardRedemptionService.redeem(studentId, idempotencyKey, redemptionRequest);
     }
 }

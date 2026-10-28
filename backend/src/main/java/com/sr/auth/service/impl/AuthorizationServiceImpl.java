@@ -1,5 +1,6 @@
 package com.sr.auth.service.impl;
 
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -13,51 +14,61 @@ import com.sr.auth.dto.request.LoginRequest;
 import com.sr.auth.dto.response.AuthenticatedUserResponse;
 import com.sr.auth.dto.response.ChangePasswordResponse;
 import com.sr.auth.service.AuthorizationService;
+import com.sr.common.audit.dto.AuditLogCommand;
+import com.sr.common.audit.service.AuditLogService;
 
 @Service
 public class AuthorizationServiceImpl implements AuthorizationService {
     private final JdbcClient db;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
 
     public AuthorizationServiceImpl(
         JdbcClient db,
-        PasswordEncoder passwordEncoder
+        PasswordEncoder passwordEncoder,
+        AuditLogService auditLogService
     ) {
         this.db = db;
         this.passwordEncoder = passwordEncoder;
+        this.auditLogService = auditLogService;
     }
 
-    private void require(UUID user, UUID classId, boolean write) {
-        String sql = """
+    private void require(UUID userId, UUID classId, boolean write) {
+        boolean ok = db.sql("""
                     SELECT EXISTS (
                         SELECT 1
                         FROM users u
-                        WHERE u.id=:u
+                        WHERE u.id = :userId
                         AND u.active
-                        AND (u.role='ADMIN' OR EXISTS (
+                        AND (u.role = 'ADMIN' OR EXISTS (
                                 SELECT 1
                                 FROM class_user_assignments a
-                                WHERE a.user_id=u.id
-                                AND a.class_id=:c
+                                WHERE a.user_id = u.id
+                                AND a.class_id = :classId
                                 AND (NOT :w OR a.can_adjust)
                             )
                         )
                     )
-            """;
+            """)
+            .param("userId", userId)
+            .param("classId", classId)
+            .param("w", write)
+            .query(Boolean.class)
+            .single();
 
-        boolean ok = db.sql(sql).param("u", user).param("c", classId).param("w", write).query(Boolean.class).single();
-        if (!ok)
+        if (!ok) {
             throw new IllegalStateException("Bạn không có quyền trên lớp này");
+        }
     }
 
     @Override
-    public void requireView(UUID user, UUID classId) {
-        require(user, classId, false);
+    public void requireView(UUID userId, UUID classId) {
+        require(userId, classId, false);
     }
 
     @Override
-    public void requireAdjust(UUID user, UUID classId) {
-        require(user, classId, true);
+    public void requireAdjust(UUID userId, UUID classId) {
+        require(userId, classId, true);
     }
 
     @Override
@@ -144,28 +155,18 @@ public class AuthorizationServiceImpl implements AuthorizationService {
             throw new IllegalStateException("Không thể cập nhật mật khẩu mới.");
         }
 
-        db.sql("""
-            INSERT INTO audit_logs (
-                id,
-                actor_id,
-                action,
-                entity_type,
-                entity_id,
-                details
+        /*
+         * Write into audit log table
+         */
+        auditLogService.record(
+            new AuditLogCommand(
+                userId,
+                "PASSWORD_CHANGED",
+                "USER",
+                userId,
+                Map.of()
             )
-            VALUES (
-                :id,
-                :actorId,
-                'PASSWORD_CHANGED',
-                'USER',
-                :userId,
-                CAST('{}' AS JSONB)
-            )
-            """)
-            .param("id", UUID.randomUUID())
-            .param("actorId", userId)
-            .param("userId", userId)
-            .update();
+        );
 
         return new ChangePasswordResponse("Đổi mật khẩu thành công!");
     }

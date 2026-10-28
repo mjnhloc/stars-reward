@@ -2,8 +2,9 @@ package com.sr.user.service.impl;
 
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
@@ -14,30 +15,35 @@ import com.sr.user.service.UserService;
 
 @Service
 public class UserServiceImpl implements UserService {
-    private static final UUID LOCAL_ADMIN = UUID.fromString("00000000-0000-0000-0000-000000000001");
-    private final boolean securityEnabled;
     private final JdbcClient jdbcClient;
 
     public UserServiceImpl(
-        @Value("${app.security.enabled:false}")
-        boolean enabled,
         JdbcClient jdbcClient
     ) {
-        this.securityEnabled = enabled;
         this.jdbcClient = jdbcClient;
     }
 
     @Override
     public UUID getUserId() {
-        if (!securityEnabled)
-            return LOCAL_ADMIN;
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof Jwt jwt))
-            throw new IllegalStateException("Chưa đăng nhập");
-        Object id = jwt.getClaim("app_user_id");
-        if (id == null)
-            throw new IllegalStateException("JWT thiếu app_user_id");
-        return UUID.fromString(id.toString());
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new AuthenticationCredentialsNotFoundException("Người dùng chưa đăng nhập");
+        }
+
+        if (!(auth.getPrincipal() instanceof Jwt jwt)) {
+            throw new IllegalStateException("Thông tin xác thực không phải JWT");
+        }
+
+        String subject = jwt.getSubject();
+        if (subject == null || subject.isBlank()) {
+            throw new IllegalStateException("JWT không chứa subject");
+        }
+
+        try {
+            return UUID.fromString(subject);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalStateException("JWT subject không phải UUID hợp lệ", exception);
+        }
     }
 
     @Override

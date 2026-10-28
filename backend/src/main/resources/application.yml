@@ -34,7 +34,6 @@ management:
                 enabled: true
 app:
     security:
-        enabled: ${APP_SECURITY_ENABLED:false}
         jwt:
             access-token-expiration-seconds: 900 # 15min
             issuer: stars-reward
