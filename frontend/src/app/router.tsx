@@ -1,9 +1,9 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
-import { AppLayout } from "../components/layout/AppLayout";
 import { ProtectedRoute } from "../features/auth/components/ProtectedRoute";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { DashboardPage } from "../features/dashboard/pages/DashboardPage";
+import { AppLayout } from "./layout/AppLayout";
 
 export const router = createBrowserRouter([
     {

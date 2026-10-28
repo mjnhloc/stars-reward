@@ -2,6 +2,11 @@ import { X } from "lucide-react";
 
 import { useStudentScores } from "../hooks/useStudentScores";
 
+import {
+    formatDate,
+    formatScore,
+    money,
+} from "../../../common/func/common.func";
 import type { Student } from "../types/student.types";
 
 type StudentDrawerProps = {
@@ -144,22 +149,4 @@ export function StudentDrawer({ student, onClose }: StudentDrawerProps) {
             </aside>
         </div>
     );
-}
-
-function formatScore(value: number | null): string {
-    if (value === null) {
-        return "–";
-    }
-
-    return new Intl.NumberFormat("vi-VN", {
-        maximumFractionDigits: 2,
-    }).format(value);
-}
-
-function formatDate(value: string): string {
-    return new Intl.DateTimeFormat("vi-VN").format(new Date(value));
-}
-
-function money(value: number): string {
-    return new Intl.NumberFormat("vi-VN").format(value) + " ₫";
 }

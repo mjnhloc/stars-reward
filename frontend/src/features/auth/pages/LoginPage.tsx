@@ -1,9 +1,9 @@
-import { Navigate } from "react-router-dom";
 import { Star } from "lucide-react";
+import { Navigate } from "react-router-dom";
 
+import { LoadingScreen } from "../../../common/ui/LoadingScreen";
 import { LoginForm } from "../components/LoginForm";
 import { useAuth } from "../hooks/useAuth";
-import { LoadingScreen } from "../../../components/ui/LoadingScreen";
 
 export function LoginPage() {
     const { isAuthenticated, isInitializing } = useAuth();

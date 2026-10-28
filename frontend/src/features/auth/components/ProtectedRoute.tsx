@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
-import { LoadingScreen } from "../../../components/ui/LoadingScreen";
+import { LoadingScreen } from "../../../common/ui/LoadingScreen";
 import { useAuth } from "../hooks/useAuth";
 import { tokenStorage } from "../services/tokenStorage";
 

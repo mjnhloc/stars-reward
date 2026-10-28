@@ -19,3 +19,16 @@ export type StudentScore = {
     assessmentDate: string;
     createdAt: string;
 };
+
+export type StudentStarsAdjustmentRequest = {
+    classId: string;
+    stars: number;
+    reasonDetail: string;
+};
+
+export type StudentStarsAdjustmentResponse = {
+    transactionId: string;
+    studentId: string;
+    starDelta: number;
+    balanceAfter: number;
+};

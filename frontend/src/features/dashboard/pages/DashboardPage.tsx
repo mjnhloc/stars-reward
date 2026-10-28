@@ -1,76 +1,56 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Award, Minus, Plus, Search, Star, Users } from "lucide-react";
+import { Award, Gift, Minus, Plus, Search, Star, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { AdjustmentModal } from "../../../features/star-transactions/components/AdjustmentModal";
 import { StudentDrawer } from "../../../features/students/components/StudentDrawer";
-import { apiClient } from "../../../lib/apiClient";
 
-import type { ClassSummary } from "../../classes/types/class.types";
+import { money } from "../../../common/func/common.func";
+import { Card } from "../../../common/ui/Card";
+import { useClasses } from "../../classes/hooks/useClasses";
+import { RewardRedemptionModal } from "../../reward/components/RewardRedemptionModal";
+import { useRedeemStudentReward } from "../../reward/hooks/useRedeemStudentReward";
+import { useAdjustStudentStars } from "../../students/hooks/useAdjustStudentStars";
 import { useStudents } from "../../students/hooks/useStudents";
 import type { Student } from "../../students/types/student.types";
-import type { Dashboard } from "../types/dashboard.types";
+import { useDashboard } from "../hooks/useDashboard";
 
 export function DashboardPage() {
-    const qc = useQueryClient();
     const [classId, setClassId] = useState("");
-    const [search, setSearch] = useState("");
-    const [selected, setSelected] = useState<Student | null>(null);
 
-    const [action, setAction] = useState<{
+    const [search, setSearch] = useState("");
+
+    const [selectedStudent, setSelectedStudent] = useState<Student | null>(
+        null,
+    );
+
+    const [adjustmentAction, setAdjustmentAction] = useState<{
         student: Student;
         mode: "add" | "subtract";
     } | null>(null);
 
-    const dashboard = useQuery({
-        queryKey: ["dashboard"],
-        queryFn: async () =>
-            (await apiClient.get<Dashboard>("/dashboard")).data,
-    });
+    const [redemptionStudent, setRedemptionStudent] = useState<Student | null>(
+        null,
+    );
 
-    const classes = useQuery({
-        queryKey: ["classes"],
-        queryFn: async () =>
-            (await apiClient.get<ClassSummary[]>("/classes")).data,
-    });
+    const dashboard = useDashboard();
+
+    const classes = useClasses();
 
     const students = useStudents(classId || undefined);
 
+    const adjustmentMutation = useAdjustStudentStars();
+
+    const rewardMutation = useRedeemStudentReward();
+
     const visible = useMemo(
         () =>
-            students.data?.filter((s) =>
-                (s.fullName + " " + s.studentCode)
+            students.data?.filter((student) =>
+                (student.fullName + " " + student.studentCode)
                     .toLowerCase()
                     .includes(search.toLowerCase()),
             ) ?? [],
         [students.data, search],
     );
-
-    const mutation = useMutation({
-        mutationFn: async (v: {
-            student: Student;
-            stars: number;
-            detail: string;
-        }) =>
-            (
-                await apiClient.post(
-                    `/students/${v.student.id}/stars/adjustments`,
-                    {
-                        classId: v.student.classId,
-                        stars: v.stars,
-                        reasonDetail: v.detail,
-                    },
-                    { headers: { "Idempotency-Key": crypto.randomUUID() } },
-                )
-            ).data,
-        onSuccess: () => {
-            setAction(null);
-            qc.invalidateQueries({ queryKey: ["students"] });
-            qc.invalidateQueries({ queryKey: ["dashboard"] });
-            qc.invalidateQueries({ queryKey: ["classes"] });
-        },
-        onError: (e) => alert(e.message),
-    });
 
     return (
         <div>
@@ -183,7 +163,7 @@ export function DashboardPage() {
                                                             type="button"
                                                             className="student"
                                                             onClick={() =>
-                                                                setSelected(
+                                                                setSelectedStudent(
                                                                     student,
                                                                 )
                                                             }
@@ -253,10 +233,12 @@ export function DashboardPage() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() =>
-                                                                    setAction({
-                                                                        student,
-                                                                        mode: "add",
-                                                                    })
+                                                                    setAdjustmentAction(
+                                                                        {
+                                                                            student,
+                                                                            mode: "add",
+                                                                        },
+                                                                    )
                                                                 }
                                                             >
                                                                 <Plus />
@@ -271,14 +253,39 @@ export function DashboardPage() {
                                                                     0
                                                                 }
                                                                 onClick={() =>
-                                                                    setAction({
-                                                                        student,
-                                                                        mode: "subtract",
-                                                                    })
+                                                                    setAdjustmentAction(
+                                                                        {
+                                                                            student,
+                                                                            mode: "subtract",
+                                                                        },
+                                                                    )
                                                                 }
                                                             >
                                                                 <Minus />
                                                                 Trừ
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                className="redeem-button"
+                                                                disabled={
+                                                                    student.redeemableStars <
+                                                                    10
+                                                                }
+                                                                title={
+                                                                    student.redeemableStars <
+                                                                    10
+                                                                        ? "Học sinh chưa đủ 10 sao"
+                                                                        : "Đổi thưởng"
+                                                                }
+                                                                onClick={() =>
+                                                                    setRedemptionStudent(
+                                                                        student,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Gift />
+                                                                Đổi thưởng
                                                             </button>
                                                         </div>
                                                     </td>
@@ -292,51 +299,70 @@ export function DashboardPage() {
                     </section>
                 </div>
             </main>
-            {action && (
+            {adjustmentAction && (
                 <AdjustmentModal
-                    student={action.student}
-                    mode={action.mode}
-                    busy={mutation.isPending}
-                    onClose={() => setAction(null)}
-                    onSubmit={(stars, detail) =>
-                        mutation.mutate({
-                            student: action.student,
-                            stars,
-                            detail,
-                        })
-                    }
+                    student={adjustmentAction.student}
+                    mode={adjustmentAction.mode}
+                    busy={adjustmentMutation.isPending}
+                    onClose={() => {
+                        if (!adjustmentMutation.isPending) {
+                            setAdjustmentAction(null);
+                        }
+                        adjustmentMutation.reset();
+                    }}
+                    onSubmit={(stars, detail) => {
+                        adjustmentMutation.mutate(
+                            {
+                                studentId: adjustmentAction.student.id,
+                                classId: adjustmentAction.student.classId,
+                                stars,
+                                reasonDetail: detail,
+                            },
+                            {
+                                onSuccess: () => {
+                                    setAdjustmentAction(null);
+                                },
+                            },
+                        );
+                    }}
                 />
             )}{" "}
-            {selected && (
+            {redemptionStudent && (
+                <RewardRedemptionModal
+                    student={redemptionStudent}
+                    busy={rewardMutation.isPending}
+                    errorMessage={rewardMutation.error?.message}
+                    onClose={() => {
+                        if (!rewardMutation.isPending) {
+                            setRedemptionStudent(null);
+                            rewardMutation.reset();
+                        }
+                    }}
+                    onConfirm={() => {
+                        rewardMutation.mutate(
+                            {
+                                studentId: redemptionStudent.id,
+                                classId: redemptionStudent.classId,
+                            },
+                            {
+                                onSuccess: () => {
+                                    setRedemptionStudent(null);
+                                },
+                            },
+                        );
+                    }}
+                />
+            )}{" "}
+            {selectedStudent && (
                 <StudentDrawer
                     student={
-                        visible.find((s) => s.id === selected.id) ?? selected
+                        visible.find(
+                            (student) => student.id === selectedStudent.id,
+                        ) ?? selectedStudent
                     }
-                    onClose={() => setSelected(null)}
+                    onClose={() => setSelectedStudent(null)}
                 />
             )}
         </div>
     );
 }
-
-function Card({
-    icon,
-    label,
-    value,
-}: {
-    icon: React.ReactNode;
-    label: string;
-    value: string;
-}) {
-    return (
-        <article className="card">
-            <div>
-                <span>{label}</span>
-                <strong>{value}</strong>
-            </div>
-            <i>{icon}</i>
-        </article>
-    );
-}
-
-const money = (v: number) => new Intl.NumberFormat("vi-VN").format(v) + " ₫";
