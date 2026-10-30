@@ -5,3 +5,16 @@ export type ClassSummary = {
     studentCount: number;
     totalStars: number;
 };
+
+export type CreateClassRequest = {
+    code: string;
+    name: string;
+    schoolYear: string;
+};
+
+export type CreateClassResponse = {
+    id: string;
+    code: string;
+    name: string;
+    schoolYear: string;
+};

@@ -1,6 +1,8 @@
 import { apiClient } from "../../../lib/apiClient";
 
 import type {
+    CreateStudentRequest,
+    CreateStudentResponse,
     Student,
     StudentScore,
     StudentStarsAdjustmentRequest,
@@ -39,6 +41,17 @@ export async function adjustStudentStars(
                 "Idempotency-Key": crypto.randomUUID(),
             },
         },
+    );
+
+    return response.data;
+}
+
+export async function createStudent(
+    request: CreateStudentRequest,
+): Promise<CreateStudentResponse> {
+    const response = await apiClient.post<CreateStudentResponse>(
+        "/students",
+        request,
     );
 
     return response.data;

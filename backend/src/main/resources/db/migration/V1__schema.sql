@@ -3,11 +3,20 @@ CREATE TABLE
         id uuid PRIMARY KEY,
         external_subject VARCHAR(200) UNIQUE,
         display_name VARCHAR(150) NOT NULL,
-        email VARCHAR(250) UNIQUE,
+        email VARCHAR(250) NOT NULL UNIQUE,
+        password_hash VARCHAR(100) NOT NULL,
         role VARCHAR(20) NOT NULL CHECK (role IN ('ADMIN', 'TEACHER', 'VIEWER')),
         active BOOLEAN NOT NULL DEFAULT true,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now ()
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+CREATE UNIQUE INDEX uq_users_email_lower
+    ON users(LOWER(email));
+
+CREATE INDEX ix_users_active_email
+    ON users (LOWER(email))
+    WHERE active = TRUE;
 
 CREATE TABLE
     classes (

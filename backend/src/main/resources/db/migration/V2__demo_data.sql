@@ -5,7 +5,8 @@ values
         '00000000-0000-0000-0000-000000000001',
         'local-admin',
         'Nguyễn Thùy Linh',
-        'admin@example.local',
+        'thuylinhh2903@gmail.com',
+        '$2a$12$s2vAq81oDsFWZQ4..Gokh.QJpFSBnqysrjATpBr8O1XNfhcbslQEa',
         'ADMIN',
         true,
         now ()

@@ -32,3 +32,20 @@ export type StudentStarsAdjustmentResponse = {
     starDelta: number;
     balanceAfter: number;
 };
+
+export type CreateStudentRequest = {
+    studentCode: string;
+    fullName: string;
+    classId: string;
+    startedAt?: string;
+};
+
+export type CreateStudentResponse = {
+    id: string;
+    studentCode: string;
+    fullName: string;
+    classId: string;
+    className: string;
+    startedAt: string;
+    totalStars: number;
+};

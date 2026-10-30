@@ -1,9 +1,12 @@
 package com.sr.student.service.impl;
 
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -14,6 +17,7 @@ import com.sr.auth.service.AuthorizationService;
 import com.sr.common.audit.dto.AuditLogCommand;
 import com.sr.common.audit.service.AuditLogService;
 import com.sr.reward.service.RewardCalculationService;
+import com.sr.student.dto.request.CreateStudentRequest;
 import com.sr.student.dto.request.StudentStarsAdjustmentRequest;
 import com.sr.student.dto.response.StudentResponse;
 import com.sr.student.dto.response.StudentScoreResponse;
@@ -21,6 +25,7 @@ import com.sr.student.dto.response.StudentStarsAdjustmentResponse;
 import com.sr.student.dto.response.StudentSummary;
 import com.sr.student.dto.response.StudentTransactionResponse;
 import com.sr.student.service.StudentService;
+import com.sr.user.service.UserService;
 
 @Service
 public class StudentServiceImpl implements StudentService {
@@ -29,23 +34,27 @@ public class StudentServiceImpl implements StudentService {
     private final AuthorizationService auth;
     private final RewardCalculationService rewardCalculationService;
     private final AuditLogService auditLogService;
+    private final UserService userService;
 
     public StudentServiceImpl(
         JdbcClient jdbcClient,
         AuthorizationService auth,
         RewardCalculationService rcs,
-        AuditLogService auditLogService
+        AuditLogService auditLogService,
+        UserService userService
     ) {
         this.jdbcClient = jdbcClient;
         this.auth = auth;
         this.rewardCalculationService = rcs;
         this.auditLogService = auditLogService;
+        this.userService = userService;
     }
 
     /*
      * Function search after name or student code for every character typed
      */
     @Override
+    @Transactional(readOnly = true)
     public List<StudentResponse> getStudents(UUID classId, String query) {
         String searchQuery = query == null ? "" : query.trim();
 
@@ -382,5 +391,143 @@ public class StudentServiceImpl implements StudentService {
             .param("studentId", studentId)
             .query(StudentScoreResponse.class)
             .list();
+    }
+
+    /*
+     * Function to create a new student
+     */
+
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public StudentSummary createStudent(CreateStudentRequest request) {
+        String normalizedStudentCode = request.studentCode().trim().toUpperCase();
+
+        String normalizedFullName = request.fullName().trim();
+
+        LocalDate startedAt = request.startedAt() != null ? request.startedAt() : LocalDate.now();
+
+        UUID actorId = userService.getUserId();
+
+        UUID studentId = UUID.randomUUID();
+        UUID enrollmentId = UUID.randomUUID();
+
+        String className = jdbcClient.sql("""
+                SELECT name
+                FROM classes
+                WHERE id = :classId
+                AND archived_at IS NULL
+            """)
+            .param("classId", request.classId())
+            .query(String.class)
+            .optional()
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lớp học"));
+
+        try {
+            int insertedStudentRows = jdbcClient.sql("""
+                    INSERT INTO students (
+                        id,
+                        student_code,
+                        full_name
+                    )
+                    VALUES (
+                        :studentId,
+                        :studentCode,
+                        :fullName
+                    )
+                """)
+                .param("studentId", studentId)
+                .param("studentCode", normalizedStudentCode)
+                .param("fullName", normalizedFullName)
+                .update();
+
+            if (insertedStudentRows != 1) {
+                throw new IllegalStateException("Không thể tạo học sinh");
+            }
+        } catch (DuplicateKeyException exception) {
+            throw new IllegalArgumentException(
+                "Mã học sinh đã tồn tại"
+            );
+        }
+
+        int insertedEnrollmentRows = jdbcClient.sql("""
+                INSERT INTO class_enrollments (
+                    id,
+                    class_id,
+                    student_id,
+                    started_at
+                )
+                VALUES (
+                    :enrollmentId,
+                    :classId,
+                    :studentId,
+                    :startedAt
+                )
+            """)
+            .param("enrollmentId", enrollmentId)
+            .param("classId", request.classId())
+            .param("studentId", studentId)
+            .param("startedAt", startedAt)
+            .update();
+
+        if (insertedEnrollmentRows != 1) {
+            throw new IllegalStateException("Không thể thêm học sinh vào lớp");
+        }
+
+        int insertedBalanceRows = jdbcClient.sql("""
+                INSERT INTO student_star_balances (
+                    student_id,
+                    total_stars,
+                    version,
+                    updated_at
+                )
+                VALUES (
+                    :studentId,
+                    0,
+                    0,
+                    :updatedAt
+                )
+            """)
+            .param("studentId", studentId)
+            .param("updatedAt", OffsetDateTime.now())
+            .update();
+
+        if (insertedBalanceRows != 1) {
+            throw new IllegalStateException(
+                "Không thể tạo số dư sao cho học sinh"
+            );
+        }
+
+        auditLogService.record(
+            new AuditLogCommand(
+                actorId,
+                "STUDENT_CREATED",
+                "STUDENT",
+                studentId,
+                Map.of(
+                    "studentCode",
+                    normalizedStudentCode,
+                    "fullName",
+                    normalizedFullName,
+                    "classId",
+                    request.classId().toString(),
+                    "className",
+                    className,
+                    "enrollmentId",
+                    enrollmentId.toString(),
+                    "startedAt",
+                    startedAt.toString()
+                )
+            )
+        );
+
+        return new StudentSummary(
+            studentId,
+            normalizedStudentCode,
+            normalizedFullName,
+            request.classId(),
+            className,
+            0
+        );
     }
 }

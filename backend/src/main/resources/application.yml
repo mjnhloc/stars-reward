@@ -1,7 +1,7 @@
 spring:
     config:
         import:
-            - file:../.env[.properties]
+            - optional:file:../.env[.properties]
     application.name: stars-reward-backend
     datasource:
         url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/${POSTGRES_DB}}
@@ -49,3 +49,10 @@ app:
     rewards:
         stars-per-redemption: 10
         vnd-per-redemption: 50000
+logging:
+    level:
+        root: INFO
+        com.sr: INFO
+
+        org.springframework.security: INFO
+        org.springframework.jdbc.core: DEBUG

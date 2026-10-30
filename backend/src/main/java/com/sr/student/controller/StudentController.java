@@ -15,10 +15,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sr.reward.service.RewardCalculationService;
+import com.sr.student.dto.request.CreateStudentRequest;
 import com.sr.student.dto.request.StudentStarsAdjustmentRequest;
 import com.sr.student.dto.response.StudentResponse;
 import com.sr.student.dto.response.StudentScoreResponse;
 import com.sr.student.dto.response.StudentStarsAdjustmentResponse;
+import com.sr.student.dto.response.StudentSummary;
 import com.sr.student.dto.response.StudentTransactionResponse;
 import com.sr.student.service.StudentService;
 import com.sr.user.service.UserService;
@@ -79,5 +81,15 @@ public class StudentController {
         UUID studentId
     ) {
         return studentService.getStudentScores(studentId);
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public StudentSummary createStudent(
+        @Valid
+        @RequestBody
+        CreateStudentRequest request
+    ) {
+        return studentService.createStudent(request);
     }
 }

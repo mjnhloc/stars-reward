@@ -1,4 +1,14 @@
-import { Award, Gift, Minus, Plus, Search, Star, Users } from "lucide-react";
+import {
+    Award,
+    FolderPlus,
+    Gift,
+    Minus,
+    Plus,
+    Search,
+    Star,
+    UserPlus,
+    Users,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { AdjustmentModal } from "../../../features/star-transactions/components/AdjustmentModal";
@@ -6,9 +16,12 @@ import { StudentDrawer } from "../../../features/students/components/StudentDraw
 
 import { money } from "../../../common/func/common.func";
 import { Card } from "../../../common/ui/Card";
+import { useAuth } from "../../auth/hooks/useAuth";
+import { CreateClassModal } from "../../classes/components/CreateClassModal";
 import { useClasses } from "../../classes/hooks/useClasses";
 import { RewardRedemptionModal } from "../../reward/components/RewardRedemptionModal";
 import { useRedeemStudentReward } from "../../reward/hooks/useRedeemStudentReward";
+import { CreateStudentModal } from "../../students/components/CreateStudentModal";
 import { useAdjustStudentStars } from "../../students/hooks/useAdjustStudentStars";
 import { useStudents } from "../../students/hooks/useStudents";
 import type { Student } from "../../students/types/student.types";
@@ -51,6 +64,13 @@ export function DashboardPage() {
             ) ?? [],
         [students.data, search],
     );
+
+    const { user } = useAuth();
+    const isAdmin = user?.role === "ADMIN";
+
+    const [isCreateClassOpen, setIsCreateClassOpen] = useState(false);
+
+    const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
 
     return (
         <div>
@@ -110,15 +130,45 @@ export function DashboardPage() {
                                 <span>{visible.length} kết quả</span>
                             </div>
 
-                            <label className="search">
-                                <Search />
+                            <div className="toolbar-actions">
+                                {isAdmin && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            className="secondary-action"
+                                            onClick={() =>
+                                                setIsCreateClassOpen(true)
+                                            }
+                                        >
+                                            <FolderPlus />
+                                            Thêm lớp
+                                        </button>
 
-                                <input
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Tìm tên hoặc mã HS"
-                                />
-                            </label>
+                                        <button
+                                            type="button"
+                                            className="primary-action"
+                                            onClick={() =>
+                                                setIsCreateStudentOpen(true)
+                                            }
+                                        >
+                                            <UserPlus />
+                                            Thêm học sinh
+                                        </button>
+                                    </>
+                                )}
+
+                                <label className="search">
+                                    <Search />
+
+                                    <input
+                                        value={search}
+                                        onChange={(e) =>
+                                            setSearch(e.target.value)
+                                        }
+                                        placeholder="Tìm tên hoặc mã HS"
+                                    />
+                                </label>
+                            </div>
                         </div>
                         {students.isLoading ? (
                             <p className="pad">Đang tải...</p>
@@ -299,6 +349,7 @@ export function DashboardPage() {
                     </section>
                 </div>
             </main>
+            {/* Modal changing student stars */}
             {adjustmentAction && (
                 <AdjustmentModal
                     student={adjustmentAction.student}
@@ -327,6 +378,7 @@ export function DashboardPage() {
                     }}
                 />
             )}{" "}
+            {/* reward redemption */}
             {redemptionStudent && (
                 <RewardRedemptionModal
                     student={redemptionStudent}
@@ -353,6 +405,7 @@ export function DashboardPage() {
                     }}
                 />
             )}{" "}
+            {/* show student details */}
             {selectedStudent && (
                 <StudentDrawer
                     student={
@@ -361,6 +414,18 @@ export function DashboardPage() {
                         ) ?? selectedStudent
                     }
                     onClose={() => setSelectedStudent(null)}
+                />
+            )}
+            {/* create a new class modal */}
+            {isCreateClassOpen && (
+                <CreateClassModal onClose={() => setIsCreateClassOpen(false)} />
+            )}
+            {/* create a new student modal */}
+            {isCreateStudentOpen && (
+                <CreateStudentModal
+                    classes={classes.data ?? []}
+                    selectedClassId={classId || undefined}
+                    onClose={() => setIsCreateStudentOpen(false)}
                 />
             )}
         </div>

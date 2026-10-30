@@ -2,6 +2,7 @@ package com.sr.dashboard.service.impl;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.sr.dashboard.dto.response.DashboardResponse;
 import com.sr.dashboard.service.DashboardService;
@@ -18,6 +19,7 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public DashboardResponse getDashboard() {
         return jdbcClient.sql("""
                 SELECT
