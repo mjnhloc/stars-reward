@@ -3,7 +3,6 @@ package com.sr.auth.service.impl;
 import java.util.Map;
 import java.util.UUID;
 
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -14,47 +13,44 @@ import com.sr.auth.dto.request.LoginRequest;
 import com.sr.auth.dto.response.AuthenticatedUserResponse;
 import com.sr.auth.dto.response.ChangePasswordResponse;
 import com.sr.auth.service.AuthorizationService;
+import com.sr.classes.repository.ClassUserAssignmentRepository;
 import com.sr.common.audit.dto.AuditLogCommand;
 import com.sr.common.audit.service.AuditLogService;
+import com.sr.user.entity.UserEntity;
+import com.sr.user.repository.UserRepository;
 
 @Service
 public class AuthorizationServiceImpl implements AuthorizationService {
-    private final JdbcClient db;
+    private final UserRepository userRepository;
+    private final ClassUserAssignmentRepository classUserAssignmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
 
     public AuthorizationServiceImpl(
-        JdbcClient db,
+        UserRepository userRepository,
+        ClassUserAssignmentRepository classUserAssignmentRepository,
         PasswordEncoder passwordEncoder,
         AuditLogService auditLogService
     ) {
-        this.db = db;
+        this.userRepository = userRepository;
+        this.classUserAssignmentRepository = classUserAssignmentRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditLogService = auditLogService;
     }
 
+    /*
+     * Active ADMIN can access every class, other users need an assignment to the
+     * class (and can_adjust when writing)
+     */
     private void require(UUID userId, UUID classId, boolean write) {
-        boolean ok = db.sql("""
-                    SELECT EXISTS (
-                        SELECT 1
-                        FROM users u
-                        WHERE u.id = :userId
-                        AND u.active
-                        AND (u.role = 'ADMIN' OR EXISTS (
-                                SELECT 1
-                                FROM class_user_assignments a
-                                WHERE a.user_id = u.id
-                                AND a.class_id = :classId
-                                AND (NOT :w OR a.can_adjust)
-                            )
-                        )
-                    )
-            """)
-            .param("userId", userId)
-            .param("classId", classId)
-            .param("w", write)
-            .query(Boolean.class)
-            .single();
+        boolean ok = userRepository.findByIdAndActiveTrue(userId)
+            .map(
+                user -> "ADMIN".equals(user.getRole())
+                    || (write
+                        ? classUserAssignmentRepository.existsByUserIdAndClassIdAndCanAdjustTrue(userId, classId)
+                        : classUserAssignmentRepository.existsByUserIdAndClassId(userId, classId))
+            )
+            .orElse(false);
 
         if (!ok) {
             throw new IllegalStateException("Bạn không có quyền trên lớp này");
@@ -76,31 +72,17 @@ public class AuthorizationServiceImpl implements AuthorizationService {
     public AuthenticatedUserResponse login(LoginRequest loginRequest) {
         String normalizedEmail = loginRequest.email().trim().toLowerCase();
 
-        AuthenticatedUserResponse user = db.sql("""
-                    SELECT
-                        id,
-                        email,
-                        password_hash,
-                        display_name,
-                        role,
-                        active
-                    FROM
-                        users
-                    WHERE LOWER(email) = :email
-                    LIMIT 1
-            """)
-            .param("email", normalizedEmail)
-            .query(
-                (result, rowNum) -> new AuthenticatedUserResponse(
-                    result.getObject("id", UUID.class),
-                    result.getString("email"),
-                    result.getString("password_hash"),
-                    result.getString("display_name"),
-                    result.getString("role"),
-                    result.getBoolean("active")
+        AuthenticatedUserResponse user = userRepository.findByNormalizedEmail(normalizedEmail)
+            .map(
+                entity -> new AuthenticatedUserResponse(
+                    entity.getId(),
+                    entity.getEmail(),
+                    entity.getPasswordHash(),
+                    entity.getDisplayName(),
+                    entity.getRole(),
+                    entity.isActive()
                 )
             )
-            .optional()
             .orElseThrow(() -> new BadCredentialsException("Tài khoản hoặc mật khẩu không chính xác"));
 
         if (!user.active() || user.passwordHash() == null
@@ -118,17 +100,10 @@ public class AuthorizationServiceImpl implements AuthorizationService {
             throw new IllegalArgumentException("Xác nhận mật khẩu không khớp.");
         }
 
-        String currPasswordHash = db.sql("""
-            SELECT password_hash
-            FROM users
-            WHERE id = :userId
-                AND active = TRUE
-            FOR UPDATE
-            """)
-            .param("userId", userId)
-            .query(String.class)
-            .optional()
+        UserEntity user = userRepository.findActiveForUpdate(userId)
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng"));
+
+        String currPasswordHash = user.getPasswordHash();
 
         if (!passwordEncoder.matches(request.currentPassword(), currPasswordHash)) {
             throw new BadCredentialsException("Mật khẩu hiện tại không chính xác.");
@@ -138,22 +113,11 @@ public class AuthorizationServiceImpl implements AuthorizationService {
             throw new BadCredentialsException("Mật khẩu mới phải khác mật khẩu hiện tại.");
         }
 
-        String newPasswordHash = passwordEncoder.encode(request.newPassword());
-
-        int updatedRows = db.sql("""
-            UPDATE users
-            SET password_hash = :newPasswordHash,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :userId
-                AND active = TRUE
-            """)
-            .param("newPasswordHash", newPasswordHash)
-            .param("userId", userId)
-            .update();
-
-        if (updatedRows != 1) {
-            throw new IllegalStateException("Không thể cập nhật mật khẩu mới.");
-        }
+        /*
+         * Entity is managed, Hibernate writes the UPDATE when the transaction commits
+         * (updated_at is set by @UpdateTimestamp)
+         */
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
 
         /*
          * Write into audit log table

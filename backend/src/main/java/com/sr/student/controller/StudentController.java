@@ -4,9 +4,11 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.sr.reward.service.RewardCalculationService;
 import com.sr.student.dto.request.CreateStudentRequest;
 import com.sr.student.dto.request.StudentStarsAdjustmentRequest;
+import com.sr.student.dto.request.UpdateStudentRequest;
 import com.sr.student.dto.response.StudentResponse;
 import com.sr.student.dto.response.StudentScoreResponse;
 import com.sr.student.dto.response.StudentStarsAdjustmentResponse;
@@ -91,5 +94,25 @@ public class StudentController {
         CreateStudentRequest request
     ) {
         return studentService.createStudent(request);
+    }
+
+    @PutMapping("/{studentId}")
+    public StudentSummary updateStudent(
+        @PathVariable
+        UUID studentId,
+        @Valid
+        @RequestBody
+        UpdateStudentRequest request
+    ) {
+        return studentService.updateStudent(studentId, request);
+    }
+
+    @DeleteMapping("/{studentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteStudent(
+        @PathVariable
+        UUID studentId
+    ) {
+        studentService.deleteStudent(studentId);
     }
 }

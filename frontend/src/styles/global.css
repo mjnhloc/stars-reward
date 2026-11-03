@@ -1149,3 +1149,8 @@ td {
         flex: 1;
     }
 }
+
+.actions button.danger-action {
+    background: #c92a2a;
+    border-color: #c92a2a;
+}

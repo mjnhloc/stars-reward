@@ -18,3 +18,16 @@ export type CreateClassResponse = {
     name: string;
     schoolYear: string;
 };
+
+export type ClassDetail = {
+    id: string;
+    code: string;
+    name: string;
+    schoolYear: string;
+};
+
+export type UpdateClassRequest = {
+    code: string;
+    name: string;
+    schoolYear: string;
+};

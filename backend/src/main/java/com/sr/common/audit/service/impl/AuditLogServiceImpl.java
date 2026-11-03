@@ -1,11 +1,10 @@
 package com.sr.common.audit.service.impl;
 
-import java.util.UUID;
-
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 
 import com.sr.common.audit.dto.AuditLogCommand;
+import com.sr.common.audit.entity.AuditLogEntity;
+import com.sr.common.audit.repository.AuditLogRepository;
 import com.sr.common.audit.service.AuditLogService;
 
 import tools.jackson.core.JacksonException;
@@ -14,14 +13,14 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class AuditLogServiceImpl implements AuditLogService {
 
-    private final JdbcClient jdbcClient;
+    private final AuditLogRepository auditLogRepository;
     private final JsonMapper jsonMapper;
 
     public AuditLogServiceImpl(
-        JdbcClient jdbcClient,
+        AuditLogRepository auditLogRepository,
         JsonMapper jsonMapper
     ) {
-        this.jdbcClient = jdbcClient;
+        this.auditLogRepository = auditLogRepository;
         this.jsonMapper = jsonMapper;
     }
 
@@ -31,37 +30,15 @@ public class AuditLogServiceImpl implements AuditLogService {
 
         String detailsJson = serializeDetails(command);
 
-        int insertedRows = jdbcClient.sql("""
-            INSERT INTO audit_logs (
-                id,
-                actor_id,
-                action,
-                entity_type,
-                entity_id,
-                details
+        auditLogRepository.save(
+            AuditLogEntity.create(
+                command.actorId(),
+                command.action(),
+                command.entityType(),
+                command.entityId(),
+                detailsJson
             )
-            VALUES (
-                :id,
-                :actorId,
-                :action,
-                :entityType,
-                :entityId,
-                CAST(:details AS JSONB)
-            )
-            """)
-            .param("id", UUID.randomUUID())
-            .param("actorId", command.actorId())
-            .param("action", command.action())
-            .param("entityType", command.entityType())
-            .param("entityId", command.entityId())
-            .param("details", detailsJson)
-            .update();
-
-        if (insertedRows != 1) {
-            throw new IllegalStateException(
-                "Không thể ghi audit log"
-            );
-        }
+        );
     }
 
     private String serializeDetails(AuditLogCommand command) {

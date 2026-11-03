@@ -7,6 +7,8 @@ import type {
     StudentScore,
     StudentStarsAdjustmentRequest,
     StudentStarsAdjustmentResponse,
+    UpdateStudentRequest,
+    UpdateStudentResponse,
 } from "../types/student.types";
 
 export async function getStudents(classId?: string): Promise<Student[]> {
@@ -55,4 +57,20 @@ export async function createStudent(
     );
 
     return response.data;
+}
+
+export async function updateStudent(
+    studentId: string,
+    request: UpdateStudentRequest,
+): Promise<UpdateStudentResponse> {
+    const response = await apiClient.put<UpdateStudentResponse>(
+        `/students/${studentId}`,
+        request,
+    );
+
+    return response.data;
+}
+
+export async function deleteStudent(studentId: string): Promise<void> {
+    await apiClient.delete(`/students/${studentId}`);
 }

@@ -2,48 +2,76 @@ package com.sr.student.service.impl;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Limit;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.sr.auth.service.AuthorizationService;
+import com.sr.classes.entity.ClassEntity;
+import com.sr.classes.repository.ClassRepository;
 import com.sr.common.audit.dto.AuditLogCommand;
 import com.sr.common.audit.service.AuditLogService;
 import com.sr.reward.service.RewardCalculationService;
 import com.sr.student.dto.request.CreateStudentRequest;
 import com.sr.student.dto.request.StudentStarsAdjustmentRequest;
+import com.sr.student.dto.request.UpdateStudentRequest;
 import com.sr.student.dto.response.StudentResponse;
 import com.sr.student.dto.response.StudentScoreResponse;
 import com.sr.student.dto.response.StudentStarsAdjustmentResponse;
 import com.sr.student.dto.response.StudentSummary;
 import com.sr.student.dto.response.StudentTransactionResponse;
+import com.sr.student.entity.ClassEnrollmentEntity;
+import com.sr.student.entity.StarTransactionEntity;
+import com.sr.student.entity.StudentEntity;
+import com.sr.student.entity.StudentStarBalanceEntity;
+import com.sr.student.repository.ClassEnrollmentRepository;
+import com.sr.student.repository.StarTransactionRepository;
+import com.sr.student.repository.StudentRepository;
+import com.sr.student.repository.StudentScoreRepository;
+import com.sr.student.repository.StudentStarBalanceRepository;
 import com.sr.student.service.StudentService;
 import com.sr.user.service.UserService;
 
 @Service
 public class StudentServiceImpl implements StudentService {
 
-    private final JdbcClient jdbcClient;
+    private final StudentRepository studentRepository;
+    private final ClassRepository classRepository;
+    private final ClassEnrollmentRepository classEnrollmentRepository;
+    private final StudentStarBalanceRepository studentStarBalanceRepository;
+    private final StarTransactionRepository starTransactionRepository;
+    private final StudentScoreRepository studentScoreRepository;
     private final AuthorizationService auth;
     private final RewardCalculationService rewardCalculationService;
     private final AuditLogService auditLogService;
     private final UserService userService;
 
     public StudentServiceImpl(
-        JdbcClient jdbcClient,
+        StudentRepository studentRepository,
+        ClassRepository classRepository,
+        ClassEnrollmentRepository classEnrollmentRepository,
+        StudentStarBalanceRepository studentStarBalanceRepository,
+        StarTransactionRepository starTransactionRepository,
+        StudentScoreRepository studentScoreRepository,
         AuthorizationService auth,
         RewardCalculationService rcs,
         AuditLogService auditLogService,
         UserService userService
     ) {
-        this.jdbcClient = jdbcClient;
+        this.studentRepository = studentRepository;
+        this.classRepository = classRepository;
+        this.classEnrollmentRepository = classEnrollmentRepository;
+        this.studentStarBalanceRepository = studentStarBalanceRepository;
+        this.starTransactionRepository = starTransactionRepository;
+        this.studentScoreRepository = studentScoreRepository;
         this.auth = auth;
         this.rewardCalculationService = rcs;
         this.auditLogService = auditLogService;
@@ -56,52 +84,11 @@ public class StudentServiceImpl implements StudentService {
     @Override
     @Transactional(readOnly = true)
     public List<StudentResponse> getStudents(UUID classId, String query) {
-        String searchQuery = query == null ? "" : query.trim();
+        String searchQuery = "%" + (query == null ? "" : query.trim()) + "%";
 
-        StringBuilder sql = new StringBuilder("""
-                    SELECT
-                        s.id,
-                        s.student_code,
-                        s.full_name,
-                        c.id AS class_id,
-                        c.name AS class_name,
-                        COALESCE(b.total_stars, 0) AS total_stars
-                    FROM students s
-                    JOIN class_enrollments e
-                        ON e.student_id = s.id
-                        AND e.ended_at IS NULL
-                    JOIN classes c
-                        ON c.id = e.class_id
-                    LEFT JOIN student_star_balances b
-                        ON b.student_id = s.id
-                    WHERE s.archived_at IS NULL
-            """);
-
-        if (classId != null) {
-            sql.append("""
-
-                AND c.id = :classId
-                """);
-        }
-
-        sql.append("""
-
-            AND (
-                LOWER(s.full_name) LIKE LOWER(:query)
-                OR LOWER(s.student_code) LIKE LOWER(:query)
-            )
-            ORDER BY s.full_name
-            LIMIT 500
-            """);
-
-        JdbcClient.StatementSpec statement = jdbcClient.sql(sql.toString())
-            .param("query", "%" + searchQuery + "%");
-
-        if (classId != null) {
-            statement = statement.param("classId", classId);
-        }
-
-        List<StudentSummary> sm = statement.query(StudentSummary.class).list();
+        List<StudentSummary> sm = classId == null
+            ? studentRepository.searchActiveStudents(searchQuery, Limit.of(500))
+            : studentRepository.searchActiveStudentsInClass(classId, searchQuery, Limit.of(500));
 
         return sm.stream().map(student -> {
             int totalStars = student.totalStars();
@@ -126,27 +113,7 @@ public class StudentServiceImpl implements StudentService {
     @Override
     @Transactional(readOnly = true)
     public List<StudentTransactionResponse> getStudentTransactions(UUID studentId) {
-        return jdbcClient.sql("""
-                SELECT
-                        t.id,
-                        t.transaction_type,
-                        t.source_type,
-                        t.star_delta,
-                        t.balance_before,
-                        t.balance_after,
-                        t.reason_detail,
-                        t.created_at,
-                        u.display_name
-                    FROM star_transactions t
-                    LEFT JOIN users u
-                        ON u.id = t.performed_by
-                    WHERE t.student_id = :studentId
-                    ORDER BY t.created_at DESC
-                    LIMIT 200
-            """)
-            .param("studentId", studentId)
-            .query(StudentTransactionResponse.class)
-            .list();
+        return starTransactionRepository.findHistory(studentId, Limit.of(200));
     }
 
     /*
@@ -184,19 +151,10 @@ public class StudentServiceImpl implements StudentService {
          */
         auth.requireAdjust(actorId, request.classId());
 
-        boolean enrolled = jdbcClient.sql("""
-                SELECT EXISTS(
-                    SELECT 1
-                    FROM class_enrollments
-                    WHERE student_id = :studentId
-                    AND class_id = :classId
-                    AND ended_at IS NULL
-                )
-            """)
-            .param("studentId", studentId)
-            .param("classId", request.classId())
-            .query(Boolean.class)
-            .single();
+        boolean enrolled = classEnrollmentRepository.existsByStudentIdAndClassIdAndEndedAtIsNull(
+            studentId,
+            request.classId()
+        );
 
         if (!enrolled) {
             throw new IllegalArgumentException("Học sinh không thuộc lớp đã chọn");
@@ -205,89 +163,43 @@ public class StudentServiceImpl implements StudentService {
         /*
          * Lock row balance until transaction finish
          */
-        int balanceBefore = jdbcClient.sql("""
-                SELECT total_stars
-                FROM student_star_balances
-                WHERE student_id = :studentId
-                FOR UPDATE
-            """)
-            .param("studentId", studentId)
-            .query(Integer.class)
-            .optional()
+        StudentStarBalanceEntity balance = studentStarBalanceRepository.findForUpdate(studentId)
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy số dư học sinh"));
+
+        int balanceBefore = balance.getTotalStars();
 
         int balanceAfter = Math.addExact(balanceBefore, request.stars());
         if (balanceAfter < 0) {
             throw new IllegalArgumentException("Không thể trừ vì tổng ngôi sao sẽ nhỏ hơn 0");
         }
 
-        UUID transactionId = UUID.randomUUID();
         String transactionType = request.stars() > 0 ? "EARN" : "DEDUCT";
 
         /*
          * insert new star transaction
          */
-        int insertedTransaction = jdbcClient.sql("""
-                INSERT INTO star_transactions (
-                    id,
-                    student_id,
-                    class_id,
-                    transaction_type,
-                    source_type,
-                    star_delta,
-                    balance_before,
-                    balance_after,
-                    reason_detail,
-                    performed_by,
-                    idempotency_key
-                )
-                VALUES (
-                    :transactionId,
-                    :studentId,
-                    :classId,
-                    :transactionType,
-                    'MANUAL',
-                    :starDelta,
-                    :balanceBefore,
-                    :balanceAfter,
-                    :reasonDetail,
-                    :performedBy,
-                    :idempotencyKey
-                )
-            """)
-            .param("transactionId", transactionId)
-            .param("studentId", studentId)
-            .param("classId", request.classId())
-            .param("transactionType", transactionType)
-            .param("starDelta", request.stars())
-            .param("balanceBefore", balanceBefore)
-            .param("balanceAfter", balanceAfter)
-            .param("reasonDetail", request.reasonDetail())
-            .param("performedBy", actorId)
-            .param("idempotencyKey", idempotencyKey)
-            .update();
+        StarTransactionEntity transaction = starTransactionRepository.save(
+            StarTransactionEntity.builder()
+                .studentId(studentId)
+                .classId(request.classId())
+                .transactionType(transactionType)
+                .sourceType("MANUAL")
+                .starDelta(request.stars())
+                .balanceBefore(balanceBefore)
+                .balanceAfter(balanceAfter)
+                .reasonDetail(request.reasonDetail())
+                .performedBy(actorId)
+                .idempotencyKey(idempotencyKey)
+                .build()
+        );
 
-        if (insertedTransaction != 1) {
-            throw new IllegalStateException("Không thể tạo giao dịch thay đổi số sao");
-        }
+        UUID transactionId = transaction.getId();
 
         /*
-         * update student star balance
+         * update student star balance (version and updated_at are handled by
+         * Hibernate)
          */
-        int updatedRows = jdbcClient.sql("""
-                UPDATE student_star_balances
-                SET total_stars = :balanceAfter,
-                    version = version + 1,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE student_id = :studentId
-            """)
-            .param("balanceAfter", balanceAfter)
-            .param("studentId", studentId)
-            .update();
-
-        if (updatedRows != 1) {
-            throw new IllegalStateException("Không thể cập nhật số dư học sinh");
-        }
+        balance.setTotalStars(balanceAfter);
 
         /*
          * insert adjustment into audit logs
@@ -328,23 +240,9 @@ public class StudentServiceImpl implements StudentService {
         String idempotencyKey,
         UUID studentId
     ) {
-        return jdbcClient.sql("""
-            SELECT
-                id,
-                student_id,
-                star_delta,
-                balance_after
-            FROM star_transactions
-            WHERE idempotency_key = :idempotencyKey
-            """)
-            .param("idempotencyKey", idempotencyKey)
-            .query((resultSet, rowNumber) -> {
-                UUID existingStudentId = resultSet.getObject(
-                    "student_id",
-                    UUID.class
-                );
-
-                if (!studentId.equals(existingStudentId)) {
+        return starTransactionRepository.findByIdempotencyKey(idempotencyKey)
+            .map(transaction -> {
+                if (!studentId.equals(transaction.getStudentId())) {
                     throw new IllegalArgumentException(
                         "Idempotency-Key đã được sử dụng "
                             + "cho một yêu cầu khác"
@@ -352,16 +250,12 @@ public class StudentServiceImpl implements StudentService {
                 }
 
                 return new StudentStarsAdjustmentResponse(
-                    resultSet.getObject(
-                        "id",
-                        UUID.class
-                    ),
-                    existingStudentId,
-                    resultSet.getInt("star_delta"),
-                    resultSet.getInt("balance_after")
+                    transaction.getId(),
+                    transaction.getStudentId(),
+                    transaction.getStarDelta(),
+                    transaction.getBalanceAfter()
                 );
             })
-            .optional()
             .orElse(null);
     }
 
@@ -373,24 +267,7 @@ public class StudentServiceImpl implements StudentService {
     public List<StudentScoreResponse> getStudentScores(
         UUID studentId
     ) {
-        return jdbcClient.sql("""
-            SELECT
-                id,
-                homework_score,
-                test_score,
-                final_score,
-                awarded_stars,
-                assessment_date,
-                created_at
-            FROM student_scores
-            WHERE student_id = :studentId
-            ORDER BY
-                assessment_date DESC,
-                created_at DESC
-            """)
-            .param("studentId", studentId)
-            .query(StudentScoreResponse.class)
-            .list();
+        return studentScoreRepository.findScores(studentId);
     }
 
     /*
@@ -409,94 +286,34 @@ public class StudentServiceImpl implements StudentService {
 
         UUID actorId = userService.getUserId();
 
-        UUID studentId = UUID.randomUUID();
-        UUID enrollmentId = UUID.randomUUID();
-
-        String className = jdbcClient.sql("""
-                SELECT name
-                FROM classes
-                WHERE id = :classId
-                AND archived_at IS NULL
-            """)
-            .param("classId", request.classId())
-            .query(String.class)
-            .optional()
+        String className = classRepository.findByIdAndArchivedAtIsNull(request.classId())
+            .map(ClassEntity::getName)
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lớp học"));
 
-        try {
-            int insertedStudentRows = jdbcClient.sql("""
-                    INSERT INTO students (
-                        id,
-                        student_code,
-                        full_name
-                    )
-                    VALUES (
-                        :studentId,
-                        :studentCode,
-                        :fullName
-                    )
-                """)
-                .param("studentId", studentId)
-                .param("studentCode", normalizedStudentCode)
-                .param("fullName", normalizedFullName)
-                .update();
+        if (studentRepository.existsByStudentCode(normalizedStudentCode)) {
+            throw new IllegalArgumentException("Mã học sinh đã tồn tại");
+        }
 
-            if (insertedStudentRows != 1) {
-                throw new IllegalStateException("Không thể tạo học sinh");
-            }
-        } catch (DuplicateKeyException exception) {
+        StudentEntity student = StudentEntity.create(normalizedStudentCode, normalizedFullName);
+
+        /*
+         * flush right away so that a duplicate student code is caught here
+         */
+        try {
+            studentRepository.saveAndFlush(student);
+        } catch (DataIntegrityViolationException exception) {
             throw new IllegalArgumentException(
                 "Mã học sinh đã tồn tại"
             );
         }
 
-        int insertedEnrollmentRows = jdbcClient.sql("""
-                INSERT INTO class_enrollments (
-                    id,
-                    class_id,
-                    student_id,
-                    started_at
-                )
-                VALUES (
-                    :enrollmentId,
-                    :classId,
-                    :studentId,
-                    :startedAt
-                )
-            """)
-            .param("enrollmentId", enrollmentId)
-            .param("classId", request.classId())
-            .param("studentId", studentId)
-            .param("startedAt", startedAt)
-            .update();
+        UUID studentId = student.getId();
 
-        if (insertedEnrollmentRows != 1) {
-            throw new IllegalStateException("Không thể thêm học sinh vào lớp");
-        }
+        ClassEnrollmentEntity enrollment = classEnrollmentRepository.save(
+            ClassEnrollmentEntity.create(request.classId(), studentId, startedAt)
+        );
 
-        int insertedBalanceRows = jdbcClient.sql("""
-                INSERT INTO student_star_balances (
-                    student_id,
-                    total_stars,
-                    version,
-                    updated_at
-                )
-                VALUES (
-                    :studentId,
-                    0,
-                    0,
-                    :updatedAt
-                )
-            """)
-            .param("studentId", studentId)
-            .param("updatedAt", OffsetDateTime.now())
-            .update();
-
-        if (insertedBalanceRows != 1) {
-            throw new IllegalStateException(
-                "Không thể tạo số dư sao cho học sinh"
-            );
-        }
+        studentStarBalanceRepository.save(StudentStarBalanceEntity.create(studentId));
 
         auditLogService.record(
             new AuditLogCommand(
@@ -514,7 +331,7 @@ public class StudentServiceImpl implements StudentService {
                     "className",
                     className,
                     "enrollmentId",
-                    enrollmentId.toString(),
+                    enrollment.getId().toString(),
                     "startedAt",
                     startedAt.toString()
                 )
@@ -528,6 +345,169 @@ public class StudentServiceImpl implements StudentService {
             request.classId(),
             className,
             0
+        );
+    }
+
+    /*
+     * Function to update student code, name and move student to another class.
+     * Stars balance and transaction history stay the same
+     */
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public StudentSummary updateStudent(UUID studentId, UpdateStudentRequest request) {
+        String normalizedStudentCode = request.studentCode().trim().toUpperCase();
+
+        String normalizedFullName = request.fullName().trim();
+
+        UUID actorId = userService.getUserId();
+
+        StudentEntity student = studentRepository.findActiveForUpdate(studentId)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy học sinh"));
+
+        String className = classRepository.findByIdAndArchivedAtIsNull(request.classId())
+            .map(ClassEntity::getName)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lớp học"));
+
+        if (studentRepository.existsByStudentCodeAndIdNot(normalizedStudentCode, studentId)) {
+            throw new IllegalArgumentException("Mã học sinh đã tồn tại");
+        }
+
+        ClassEnrollmentEntity currentEnrollment = classEnrollmentRepository.findByStudentIdAndEndedAtIsNull(studentId)
+            .orElseThrow(() -> new IllegalArgumentException("Học sinh hiện không thuộc lớp nào"));
+
+        UUID fromClassId = currentEnrollment.getClassId();
+
+        Map<String, Object> details = new HashMap<>();
+        details.put(
+            "before",
+            Map.of(
+                "studentCode",
+                student.getStudentCode(),
+                "fullName",
+                student.getFullName(),
+                "classId",
+                fromClassId.toString()
+            )
+        );
+        details.put(
+            "after",
+            Map.of(
+                "studentCode",
+                normalizedStudentCode,
+                "fullName",
+                normalizedFullName,
+                "classId",
+                request.classId().toString()
+            )
+        );
+
+        student.setStudentCode(normalizedStudentCode);
+        student.setFullName(normalizedFullName);
+
+        try {
+            studentRepository.saveAndFlush(student);
+        } catch (DataIntegrityViolationException exception) {
+            throw new IllegalArgumentException("Mã học sinh đã tồn tại");
+        }
+
+        /*
+         * Move student to another class
+         */
+        if (!fromClassId.equals(request.classId())) {
+            LocalDate today = LocalDate.now();
+
+            if (today.equals(currentEnrollment.getStartedAt())) {
+                /*
+                 * Enrollment started today, only correct the class (no history needed)
+                 */
+                currentEnrollment.setClassId(request.classId());
+            } else {
+                /*
+                 * End the current enrollment and flush before inserting the new one, so
+                 * that the unique index on active enrollment is never violated
+                 */
+                currentEnrollment.setEndedAt(today);
+                classEnrollmentRepository.saveAndFlush(currentEnrollment);
+
+                ClassEnrollmentEntity newEnrollment = classEnrollmentRepository.save(
+                    ClassEnrollmentEntity.create(request.classId(), studentId, today)
+                );
+
+                details.put("newEnrollmentId", newEnrollment.getId().toString());
+            }
+
+            details.put("fromClassId", fromClassId.toString());
+            details.put("toClassId", request.classId().toString());
+        }
+
+        auditLogService.record(
+            new AuditLogCommand(
+                actorId,
+                "STUDENT_UPDATED",
+                "STUDENT",
+                studentId,
+                details
+            )
+        );
+
+        int totalStars = studentStarBalanceRepository.findById(studentId)
+            .map(StudentStarBalanceEntity::getTotalStars)
+            .orElse(0);
+
+        return new StudentSummary(
+            studentId,
+            normalizedStudentCode,
+            normalizedFullName,
+            request.classId(),
+            className,
+            totalStars
+        );
+    }
+
+    /*
+     * Function to soft delete a student. Ledger, scores and redemptions are kept
+     */
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public void deleteStudent(UUID studentId) {
+        UUID actorId = userService.getUserId();
+
+        StudentEntity student = studentRepository.findActiveForUpdate(studentId)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy học sinh"));
+
+        student.setArchivedAt(OffsetDateTime.now());
+
+        Map<String, Object> details = new HashMap<>();
+        details.put("studentCode", student.getStudentCode());
+        details.put("fullName", student.getFullName());
+
+        /*
+         * End the active enrollment, so that student cannot receive or redeem stars
+         * anymore
+         */
+        classEnrollmentRepository.findByStudentIdAndEndedAtIsNull(studentId)
+            .ifPresent(enrollment -> {
+                enrollment.setEndedAt(LocalDate.now());
+                details.put("classId", enrollment.getClassId().toString());
+            });
+
+        details.put(
+            "totalStars",
+            studentStarBalanceRepository.findById(studentId)
+                .map(StudentStarBalanceEntity::getTotalStars)
+                .orElse(0)
+        );
+
+        auditLogService.record(
+            new AuditLogCommand(
+                actorId,
+                "STUDENT_ARCHIVED",
+                "STUDENT",
+                studentId,
+                details
+            )
         );
     }
 }

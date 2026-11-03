@@ -4,7 +4,7 @@ Production-oriented monorepo for student reward points.
 
 ## Stack
 - React + TypeScript + Vite + TanStack Query
-- Java 21 + Spring Boot + JDBC + Spring Security Resource Server
+- Java 21 + Spring Boot + Spring Data JPA (Hibernate) + Spring Security Resource Server
 - PostgreSQL + Flyway
 - Docker Compose
 

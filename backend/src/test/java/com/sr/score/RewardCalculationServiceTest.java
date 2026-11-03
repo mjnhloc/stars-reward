@@ -6,6 +6,6 @@ class RewardCalculationServiceTest {
     public static void main(String[] args) {
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
 
-        System.out.println("password: " + encoder.encode("Thuylinh2903."));
+        System.out.println("password: " + encoder.encode("Minhloc@1"));
     }
 }

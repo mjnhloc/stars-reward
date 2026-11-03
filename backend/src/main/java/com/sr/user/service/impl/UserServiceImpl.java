@@ -2,7 +2,6 @@ package com.sr.user.service.impl;
 
 import java.util.UUID;
 
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -11,16 +10,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.sr.user.dto.response.AuthUserResponse;
+import com.sr.user.repository.UserRepository;
 import com.sr.user.service.UserService;
 
 @Service
 public class UserServiceImpl implements UserService {
-    private final JdbcClient jdbcClient;
+    private final UserRepository userRepository;
 
     public UserServiceImpl(
-        JdbcClient jdbcClient
+        UserRepository userRepository
     ) {
-        this.jdbcClient = jdbcClient;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -49,26 +49,15 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public AuthUserResponse getCurrentUser(UUID userId) {
-        return jdbcClient.sql("""
-            SELECT
-                id,
-                email,
-                display_name,
-                role
-            FROM users
-            WHERE id = :userId
-                AND active = true
-            """)
-            .param("userId", userId)
-            .query(
-                (resultSet, rowNum) -> new AuthUserResponse(
-                    resultSet.getObject("id", UUID.class),
-                    resultSet.getString("email"),
-                    resultSet.getString("display_name"),
-                    resultSet.getString("role")
+        return userRepository.findByIdAndActiveTrue(userId)
+            .map(
+                user -> new AuthUserResponse(
+                    user.getId(),
+                    user.getEmail(),
+                    user.getDisplayName(),
+                    user.getRole()
                 )
             )
-            .optional()
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng"));
     }
 }

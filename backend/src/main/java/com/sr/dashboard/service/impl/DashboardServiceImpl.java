@@ -1,33 +1,26 @@
 package com.sr.dashboard.service.impl;
 
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.sr.dashboard.dto.response.DashboardResponse;
 import com.sr.dashboard.service.DashboardService;
+import com.sr.student.repository.StudentStarBalanceRepository;
 
 @Service
 public class DashboardServiceImpl implements DashboardService {
 
-    private final JdbcClient jdbcClient;
+    private final StudentStarBalanceRepository studentStarBalanceRepository;
 
     public DashboardServiceImpl(
-        JdbcClient jdbcClient
+        StudentStarBalanceRepository studentStarBalanceRepository
     ) {
-        this.jdbcClient = jdbcClient;
+        this.studentStarBalanceRepository = studentStarBalanceRepository;
     }
 
     @Override
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard() {
-        return jdbcClient.sql("""
-                SELECT
-                    COUNT(*) AS total_students,
-                    COALESCE(SUM(total_stars), 0) AS total_stars
-                FROM student_star_balances
-            """)
-            .query(DashboardResponse.class)
-            .single();
+        return studentStarBalanceRepository.getDashboardSummary();
     }
 }

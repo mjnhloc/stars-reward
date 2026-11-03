@@ -49,3 +49,18 @@ export type CreateStudentResponse = {
     startedAt: string;
     totalStars: number;
 };
+
+export type UpdateStudentRequest = {
+    studentCode: string;
+    fullName: string;
+    classId: string;
+};
+
+export type UpdateStudentResponse = {
+    id: string;
+    studentCode: string;
+    fullName: string;
+    classId: string;
+    className: string;
+    totalStars: number;
+};
