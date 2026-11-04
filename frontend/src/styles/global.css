@@ -1154,3 +1154,57 @@ td {
     background: #c92a2a;
     border-color: #c92a2a;
 }
+
+.transaction-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.transaction-filters button {
+    padding: 6px 11px;
+
+    color: #697386;
+    background: #f3f5f8;
+    border: 0;
+    border-radius: 999px;
+
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.transaction-filters button.active {
+    color: #ffffff;
+    background: #172033;
+}
+
+.transaction-delta {
+    flex: 0 0 auto;
+    padding: 5px 9px;
+    background: #f1f4f8;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.score-item-header .transaction-delta.positive {
+    color: #087f5b;
+}
+
+.score-item-header .transaction-delta.negative {
+    color: #c92a2a;
+}
+
+.transaction-reason {
+    margin: 0 0 8px;
+    color: #344054;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.transaction-meta {
+    margin: 0;
+    color: #7a8495;
+    font-size: 12px;
+}

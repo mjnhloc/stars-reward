@@ -1,12 +1,13 @@
+import { useState } from "react";
+
 import { X } from "lucide-react";
 
 import { useStudentScores } from "../hooks/useStudentScores";
+import { useStudentTransactions } from "../hooks/useStudentTransactions";
+import { StudentScoreHistory } from "./StudentScoreHistory";
+import { StudentTransactionHistory } from "./StudentTransactionHistory";
 
-import {
-    formatDate,
-    formatScore,
-    money,
-} from "../../../common/func/common.func";
+import { money } from "../../../common/func/common.func";
 import type { Student } from "../types/student.types";
 
 type StudentDrawerProps = {
@@ -14,8 +15,28 @@ type StudentDrawerProps = {
     onClose: () => void;
 };
 
+type DrawerTab = "scores" | "transactions";
+
 export function StudentDrawer({ student, onClose }: StudentDrawerProps) {
+    const [activeTab, setActiveTab] = useState<DrawerTab>("scores");
+
+    // chỉ tải giao dịch khi người dùng mở tab lần đầu
+    const [hasOpenedTransactions, setHasOpenedTransactions] = useState(false);
+
     const scores = useStudentScores(student.id);
+
+    const transactions = useStudentTransactions(
+        student.id,
+        hasOpenedTransactions,
+    );
+
+    function openTab(tab: DrawerTab) {
+        setActiveTab(tab);
+
+        if (tab === "transactions") {
+            setHasOpenedTransactions(true);
+        }
+    }
 
     return (
         <div className="drawerWrap">
@@ -73,79 +94,35 @@ export function StudentDrawer({ student, onClose }: StudentDrawerProps) {
                     </div>
                 </section>
 
-                <section className="score-history">
-                    <div className="section-heading">
-                        <div>
-                            <h3>Chi tiết điểm học tập</h3>
+                <div className="profile-tabs" role="tablist">
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === "scores"}
+                        className={activeTab === "scores" ? "active" : ""}
+                        onClick={() => openTab("scores")}
+                    >
+                        Lịch sử điểm
+                        {scores.data && ` (${scores.data.length})`}
+                    </button>
 
-                            <p>Điểm theo từng lần đánh giá</p>
-                        </div>
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === "transactions"}
+                        className={activeTab === "transactions" ? "active" : ""}
+                        onClick={() => openTab("transactions")}
+                    >
+                        Giao dịch sao
+                        {transactions.data && ` (${transactions.data.length})`}
+                    </button>
+                </div>
 
-                        {scores.data && <span>{scores.data.length} lần</span>}
-                    </div>
-
-                    {scores.isLoading ? (
-                        <p className="muted">Đang tải lịch sử điểm...</p>
-                    ) : scores.error ? (
-                        <p className="error">{scores.error.message}</p>
-                    ) : scores.data?.length === 0 ? (
-                        <div className="empty-state">
-                            Học sinh chưa có dữ liệu điểm.
-                        </div>
-                    ) : (
-                        <div className="score-list">
-                            {scores.data?.map((score, index) => (
-                                <article key={score.id} className="score-item">
-                                    <div className="score-item-header">
-                                        <div>
-                                            <strong>
-                                                Lần {scores.data.length - index}
-                                            </strong>
-
-                                            <span>
-                                                {formatDate(
-                                                    score.assessmentDate,
-                                                )}
-                                            </span>
-                                        </div>
-
-                                        <span className="score-stars">
-                                            +{score.awardedStars} sao
-                                        </span>
-                                    </div>
-
-                                    <div className="score-values">
-                                        <div>
-                                            <span>BTVN</span>
-
-                                            <strong>
-                                                {formatScore(
-                                                    score.homeworkScore,
-                                                )}
-                                            </strong>
-                                        </div>
-
-                                        <div>
-                                            <span>Kiểm tra</span>
-
-                                            <strong>
-                                                {formatScore(score.testScore)}
-                                            </strong>
-                                        </div>
-
-                                        <div className="final-score">
-                                            <span>Điểm tính</span>
-
-                                            <strong>
-                                                {formatScore(score.finalScore)}
-                                            </strong>
-                                        </div>
-                                    </div>
-                                </article>
-                            ))}
-                        </div>
-                    )}
-                </section>
+                {activeTab === "scores" ? (
+                    <StudentScoreHistory studentId={student.id} />
+                ) : (
+                    <StudentTransactionHistory studentId={student.id} />
+                )}
             </aside>
         </div>
     );

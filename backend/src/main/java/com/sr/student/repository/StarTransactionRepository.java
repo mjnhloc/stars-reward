@@ -29,11 +29,14 @@ public interface StarTransactionRepository extends JpaRepository<StarTransaction
             t.balanceAfter,
             t.reasonDetail,
             t.createdAt,
-            u.displayName
+            u.displayName,
+            c.name
         )
         FROM StarTransactionEntity t
         LEFT JOIN UserEntity u
             ON u.id = t.performedBy
+        LEFT JOIN ClassEntity c
+            ON c.id = t.classId
         WHERE t.studentId = :studentId
         ORDER BY t.createdAt DESC
         """)

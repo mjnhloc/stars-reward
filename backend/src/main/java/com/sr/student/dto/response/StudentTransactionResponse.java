@@ -12,5 +12,6 @@ public record StudentTransactionResponse(
     Integer balanceAfter,
     String reasonDetail,
     OffsetDateTime createdAt,
-    String displayName
+    String displayName,
+    String className
 ) {}

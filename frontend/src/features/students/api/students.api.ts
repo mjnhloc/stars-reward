@@ -1,5 +1,6 @@
 import { apiClient } from "../../../lib/apiClient";
 
+import type { StudentTransaction } from "../../star-transactions/types/star-transaction.types";
 import type {
     CreateStudentRequest,
     CreateStudentResponse,
@@ -26,6 +27,16 @@ export async function getStudentScores(
 ): Promise<StudentScore[]> {
     const response = await apiClient.get<StudentScore[]>(
         `/students/${studentId}/scores`,
+    );
+
+    return response.data;
+}
+
+export async function getStudentTransactions(
+    studentId: string,
+): Promise<StudentTransaction[]> {
+    const response = await apiClient.get<StudentTransaction[]>(
+        `/students/${studentId}/transactions`,
     );
 
     return response.data;

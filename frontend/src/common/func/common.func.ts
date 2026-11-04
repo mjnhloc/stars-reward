@@ -12,6 +12,9 @@ export function formatScore(value: number | null): string {
     }).format(value);
 }
 
-export function formatDate(value: string): string {
-    return new Intl.DateTimeFormat("vi-VN").format(new Date(value));
+export function formatDate(value: string, withTime = false): string {
+    return new Intl.DateTimeFormat(
+        "vi-VN",
+        withTime ? { dateStyle: "short", timeStyle: "short" } : undefined,
+    ).format(new Date(value));
 }
