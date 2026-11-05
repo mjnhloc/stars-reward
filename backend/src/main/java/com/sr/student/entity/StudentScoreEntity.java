@@ -9,6 +9,8 @@ import org.hibernate.annotations.Immutable;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -16,7 +18,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /*
- * Read only in this application, scores are written by the import process
+ * Insert only, scores are written by the score import process
  */
 @Entity
 @Immutable
@@ -26,6 +28,7 @@ import lombok.NoArgsConstructor;
 public class StudentScoreEntity {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(name = "student_id", nullable = false)
@@ -57,4 +60,29 @@ public class StudentScoreEntity {
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
+
+    public static StudentScoreEntity create(
+        UUID studentId,
+        UUID classId,
+        BigDecimal homeworkScore,
+        BigDecimal testScore,
+        BigDecimal finalScore,
+        int awardedStars,
+        LocalDate assessmentDate,
+        UUID importBatchId,
+        String externalRowId
+    ) {
+        StudentScoreEntity score = new StudentScoreEntity();
+        score.studentId = studentId;
+        score.classId = classId;
+        score.homeworkScore = homeworkScore;
+        score.testScore = testScore;
+        score.finalScore = finalScore;
+        score.awardedStars = awardedStars;
+        score.assessmentDate = assessmentDate;
+        score.importBatchId = importBatchId;
+        score.externalRowId = externalRowId;
+        score.createdAt = OffsetDateTime.now();
+        return score;
+    }
 }

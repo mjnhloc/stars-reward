@@ -14,7 +14,7 @@ The frontend is feature-oriented. The backend is a modular monolith split into a
 8. Commit, then return the transaction and new balance.
 
 ## Score calculation
-`final = homework * 0.60 + test * 0.40`, calculated with Java `BigDecimal`. Stored score keeps scale 2. Star thresholds compare exact decimals and do not compare rounded UI text.
+`final = homework * 0.70 + test * 0.30`, calculated with Java `BigDecimal`. Stored score keeps scale 2. Star thresholds compare exact decimals and do not compare rounded UI text.
 `final = 10` will equal to 3 stars.
 `final = 9` will equal to 2 stars.
 `final = 8` will equal to 1 star.

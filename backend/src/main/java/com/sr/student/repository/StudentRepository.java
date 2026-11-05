@@ -1,5 +1,6 @@
 package com.sr.student.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,7 +45,10 @@ public interface StudentRepository extends JpaRepository<StudentEntity, UUID> {
             )
         ORDER BY s.fullName
         """)
-    List<StudentSummary> searchActiveStudents(@Param("query") String query, Limit limit);
+    List<StudentSummary> searchActiveStudents(
+        @Param("query")
+        String query, Limit limit
+    );
 
     /*
      * Same as searchActiveStudents but only in one class
@@ -75,8 +79,10 @@ public interface StudentRepository extends JpaRepository<StudentEntity, UUID> {
         ORDER BY s.fullName
         """)
     List<StudentSummary> searchActiveStudentsInClass(
-        @Param("classId") UUID classId,
-        @Param("query") String query,
+        @Param("classId")
+        UUID classId,
+        @Param("query")
+        String query,
         Limit limit
     );
 
@@ -90,9 +96,14 @@ public interface StudentRepository extends JpaRepository<StudentEntity, UUID> {
         WHERE s.id = :studentId
             AND s.archivedAt IS NULL
         """)
-    Optional<StudentEntity> findActiveForUpdate(@Param("studentId") UUID studentId);
+    Optional<StudentEntity> findActiveForUpdate(
+        @Param("studentId")
+        UUID studentId
+    );
 
     boolean existsByStudentCode(String studentCode);
+
+    List<StudentEntity> findByStudentCodeIn(Collection<String> studentCodes);
 
     boolean existsByStudentCodeAndIdNot(String studentCode, UUID id);
 }

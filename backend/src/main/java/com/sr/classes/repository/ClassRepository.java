@@ -41,6 +41,8 @@ public interface ClassRepository extends JpaRepository<ClassEntity, UUID> {
 
     Optional<ClassEntity> findByIdAndArchivedAtIsNull(UUID id);
 
+    List<ClassEntity> findByArchivedAtIsNull();
+
     /*
      * SELECT ... FOR UPDATE
      */

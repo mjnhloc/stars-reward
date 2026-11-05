@@ -1,5 +1,7 @@
 package com.sr.student.repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,6 +16,8 @@ public interface ClassEnrollmentRepository extends JpaRepository<ClassEnrollment
     boolean existsByStudentIdAndClassIdAndEndedAtIsNull(UUID studentId, UUID classId);
 
     Optional<ClassEnrollmentEntity> findByStudentIdAndEndedAtIsNull(UUID studentId);
+
+    List<ClassEnrollmentEntity> findByStudentIdInAndEndedAtIsNull(Collection<UUID> studentIds);
 
     /*
      * Number of active students currently studying in a class

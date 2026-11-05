@@ -8,6 +8,8 @@ Base path: `/api/v1`
 - `GET /students/{id}`
 - `GET /students/{id}/transactions?page=&size=`
 - `POST /students/{id}/stars/adjustments`
+- `POST /score-imports/preview` (multipart `file`, Excel): read the score sheet and return what will be imported, nothing is saved
+- `POST /score-imports` (multipart `file`, Excel): import new sessions and award stars. Already imported sessions (same student and date) are skipped
 
 Mutation requests require `Idempotency-Key` header.
 

@@ -1,5 +1,6 @@
 import {
     Award,
+    FileSpreadsheet,
     FolderPlus,
     Gift,
     Minus,
@@ -26,6 +27,7 @@ import { useClasses } from "../../classes/hooks/useClasses";
 import { useDeleteClass } from "../../classes/hooks/useDeleteClass";
 import { RewardRedemptionModal } from "../../reward/components/RewardRedemptionModal";
 import { useRedeemStudentReward } from "../../reward/hooks/useRedeemStudentReward";
+import { ImportScoresModal } from "../../score-import/components/ImportScoresModal";
 import { CreateStudentModal } from "../../students/components/CreateStudentModal";
 import { EditStudentModal } from "../../students/components/EditStudentModal";
 import { useAdjustStudentStars } from "../../students/hooks/useAdjustStudentStars";
@@ -78,6 +80,8 @@ export function DashboardPage() {
     const [isCreateClassOpen, setIsCreateClassOpen] = useState(false);
 
     const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
+
+    const [isImportScoresOpen, setIsImportScoresOpen] = useState(false);
 
     const [isEditClassOpen, setIsEditClassOpen] = useState(false);
 
@@ -185,6 +189,17 @@ export function DashboardPage() {
                                                 </button>
                                             </>
                                         )}
+
+                                        <button
+                                            type="button"
+                                            className="secondary-action"
+                                            onClick={() =>
+                                                setIsImportScoresOpen(true)
+                                            }
+                                        >
+                                            <FileSpreadsheet />
+                                            Nhập điểm Excel
+                                        </button>
 
                                         <button
                                             type="button"
@@ -498,6 +513,12 @@ export function DashboardPage() {
                         ) ?? selectedStudent
                     }
                     onClose={() => setSelectedStudent(null)}
+                />
+            )}
+            {/* import scores from excel */}
+            {isImportScoresOpen && (
+                <ImportScoresModal
+                    onClose={() => setIsImportScoresOpen(false)}
                 />
             )}
             {/* create a new class modal */}

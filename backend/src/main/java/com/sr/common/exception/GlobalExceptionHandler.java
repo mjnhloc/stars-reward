@@ -10,6 +10,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import com.sr.common.exception.dto.ApiErrorResponse;
 
@@ -45,6 +46,22 @@ public class GlobalExceptionHandler {
             HttpStatus.BAD_REQUEST.value(),
             "INVALID_REQUEST",
             exception.getMessage(),
+            request.getRequestURI(),
+            OffsetDateTime.now()
+        );
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleMaxUploadSize(
+        MaxUploadSizeExceededException exception,
+        HttpServletRequest request
+    ) {
+        ApiErrorResponse response = new ApiErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            "FILE_TOO_LARGE",
+            "File vượt quá dung lượng cho phép (10MB)",
             request.getRequestURI(),
             OffsetDateTime.now()
         );

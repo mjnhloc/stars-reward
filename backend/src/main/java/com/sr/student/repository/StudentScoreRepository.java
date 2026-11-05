@@ -1,5 +1,6 @@
 package com.sr.student.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,5 +29,10 @@ public interface StudentScoreRepository extends JpaRepository<StudentScoreEntity
             s.assessmentDate DESC,
             s.createdAt DESC
         """)
-    List<StudentScoreResponse> findScores(@Param("studentId") UUID studentId);
+    List<StudentScoreResponse> findScores(
+        @Param("studentId")
+        UUID studentId
+    );
+
+    List<StudentScoreEntity> findByStudentIdIn(Collection<UUID> studentIds);
 }

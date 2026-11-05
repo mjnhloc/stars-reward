@@ -1208,3 +1208,292 @@ td {
     color: #7a8495;
     font-size: 12px;
 }
+
+.import-modal {
+    width: min(860px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+}
+
+.import-dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-top: 18px;
+    padding: 32px 20px;
+
+    text-align: center;
+    background: #f8fafc;
+    border: 1px dashed #d9e0e9;
+    border-radius: 14px;
+    cursor: pointer;
+}
+
+.modal .import-dropzone {
+    font-weight: 400;
+}
+
+.import-dropzone:hover,
+.import-dropzone.dragging {
+    background: #fff8e6;
+    border-color: #f5dc9a;
+}
+
+.import-dropzone svg {
+    width: 30px;
+    height: 30px;
+    color: #8a5c00;
+}
+
+.import-dropzone strong {
+    color: #172033;
+    font-size: 14px;
+}
+
+.import-dropzone span {
+    max-width: 460px;
+    color: #697386;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.import-dropzone input {
+    display: none;
+}
+
+.import-formula {
+    margin: 10px 0 0;
+    color: #7a8495;
+    font-size: 12px;
+    text-align: center;
+}
+
+.import-loading,
+.import-file {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 18px;
+    color: #697386;
+    font-size: 13px;
+}
+
+.import-loading {
+    justify-content: center;
+    padding: 32px 0;
+}
+
+.import-loading svg,
+.import-file svg {
+    width: 18px;
+    height: 18px;
+    color: #087f5b;
+}
+
+.import-file strong {
+    color: #344054;
+}
+
+.import-summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.import-summary > div {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px;
+
+    background: #f8fafc;
+    border: 1px solid #edf0f4;
+    border-radius: 12px;
+}
+
+.import-summary span {
+    color: #697386;
+    font-size: 12px;
+}
+
+.import-summary strong {
+    color: #344054;
+    font-size: 18px;
+}
+
+.import-summary strong.positive {
+    color: #087f5b;
+}
+
+.import-issues {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+}
+
+.import-issues summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.import-issues summary svg {
+    width: 16px;
+    height: 16px;
+}
+
+.import-issues ul {
+    max-height: 180px;
+    overflow: auto;
+    margin: 10px 0 0;
+    padding-left: 18px;
+    line-height: 1.5;
+}
+
+.import-issues li + li {
+    margin-top: 6px;
+}
+
+.import-issues small {
+    display: block;
+    opacity: 0.8;
+}
+
+.import-issues.error-list {
+    color: #b42318;
+    background: #fff7f6;
+    border: 1px solid #f0b8b3;
+}
+
+.import-issues.warning-list {
+    color: #7a5200;
+    background: #fff8e6;
+    border: 1px solid #f5dc9a;
+}
+
+.import-class {
+    margin-top: 18px;
+}
+
+.import-class h3 {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0 0 8px;
+    font-size: 15px;
+}
+
+.import-class h3 span {
+    color: #7a8495;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.import-class .tableWrap {
+    border: 1px solid #edf0f4;
+    border-radius: 12px;
+}
+
+.import-table td,
+.import-table th {
+    padding: 9px 10px;
+    font-size: 13px;
+}
+
+.import-student {
+    cursor: pointer;
+}
+
+.import-student:hover,
+.import-student.expanded {
+    background: #f8fafc;
+}
+
+.import-student .icon svg {
+    width: 16px;
+    height: 16px;
+    color: #697386;
+}
+
+.import-conflict-icon {
+    width: 14px;
+    height: 14px;
+    margin-left: 6px;
+    vertical-align: -2px;
+    color: #9a6700;
+}
+
+.import-sessions > td {
+    padding: 0 10px 12px 42px;
+    background: #f8fafc;
+}
+
+.import-sessions table {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #edf0f4;
+    border-radius: 10px;
+}
+
+.import-sessions th,
+.import-sessions td {
+    padding: 7px 10px;
+    font-size: 12px;
+}
+
+.import-status {
+    padding: 3px 8px;
+    color: #697386;
+    background: #f1f4f8;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.status-new .import-status {
+    color: #087f5b;
+    background: #ecfdf3;
+}
+
+.status-conflict .import-status {
+    color: #7a5200;
+    background: #fff1bd;
+}
+
+.status-exists td {
+    color: #98a2b3;
+}
+
+.import-success {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 18px;
+    padding: 14px;
+
+    color: #087f5b;
+    background: #ecfdf3;
+    border: 1px solid #abefc6;
+    border-radius: 12px;
+
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.import-success svg {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+}
+
+@media (max-width: 640px) {
+    .import-summary {
+        grid-template-columns: 1fr 1fr;
+    }
+}
