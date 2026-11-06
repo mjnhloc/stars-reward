@@ -1,8 +1,11 @@
 import { apiClient } from "../../../lib/apiClient";
 
 import type {
+    ImportBatch,
+    ImportRevertPreview,
     ScoreImportPreview,
     ScoreImportResult,
+    ScoreImportRevertResult,
 } from "../types/score-import.types";
 
 // file upload can take longer than normal requests
@@ -40,6 +43,32 @@ export async function importScores(file: File): Promise<ScoreImportResult> {
             headers: { "Content-Type": "multipart/form-data" },
             timeout: UPLOAD_TIMEOUT,
         },
+    );
+
+    return response.data;
+}
+
+export async function getScoreImports(): Promise<ImportBatch[]> {
+    const response = await apiClient.get<ImportBatch[]>("/score-imports");
+
+    return response.data;
+}
+
+export async function getRevertPreview(
+    batchId: string,
+): Promise<ImportRevertPreview> {
+    const response = await apiClient.get<ImportRevertPreview>(
+        `/score-imports/${batchId}/revert-preview`,
+    );
+
+    return response.data;
+}
+
+export async function revertScoreImport(
+    batchId: string,
+): Promise<ScoreImportRevertResult> {
+    const response = await apiClient.post<ScoreImportRevertResult>(
+        `/score-imports/${batchId}/revert`,
     );
 
     return response.data;

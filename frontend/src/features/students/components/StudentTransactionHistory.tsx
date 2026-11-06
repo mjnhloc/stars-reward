@@ -12,13 +12,14 @@ type Props = {
     studentId: string;
 };
 
-type TransactionFilter = "ALL" | "EARN" | "DEDUCT" | "REDEEM";
+type TransactionFilter = "ALL" | "EARN" | "DEDUCT" | "REDEEM" | "REVERSAL";
 
 const FILTERS: { value: TransactionFilter; label: string }[] = [
     { value: "ALL", label: "Tất cả" },
     { value: "EARN", label: "Cộng" },
     { value: "DEDUCT", label: "Trừ" },
     { value: "REDEEM", label: "Đổi thưởng" },
+    { value: "REVERSAL", label: "Hoàn tác" },
 ];
 
 const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
@@ -83,7 +84,9 @@ export function StudentTransactionHistory({ studentId }: Props) {
             ) : transactions.error ? (
                 <p className="error">{transactions.error.message}</p>
             ) : transactions.data?.length === 0 ? (
-                <div className="empty-state">Học sinh chưa có giao dịch sao.</div>
+                <div className="empty-state">
+                    Học sinh chưa có giao dịch sao.
+                </div>
             ) : visible.length === 0 ? (
                 <div className="empty-state">
                     Không có giao dịch phù hợp với bộ lọc.
@@ -101,7 +104,10 @@ export function StudentTransactionHistory({ studentId }: Props) {
                                     </strong>
 
                                     <span>
-                                        {formatDate(transaction.createdAt, true)}
+                                        {formatDate(
+                                            transaction.createdAt,
+                                            true,
+                                        )}
                                         {transaction.className &&
                                             ` · ${transaction.className}`}
                                     </span>

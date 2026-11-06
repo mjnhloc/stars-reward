@@ -10,6 +10,9 @@ Base path: `/api/v1`
 - `POST /students/{id}/stars/adjustments`
 - `POST /score-imports/preview` (multipart `file`, Excel): read the score sheet and return what will be imported, nothing is saved
 - `POST /score-imports` (multipart `file`, Excel): import new sessions and award stars. Already imported sessions (same student and date) are skipped
+- `GET /score-imports`: finished imports, newest first
+- `GET /score-imports/{id}/revert-preview`: stars every student loses when the import is reverted, nothing is saved
+- `POST /score-imports/{id}/revert`: take back the stars with reversal transactions and void the scores, so the file can be imported again. Blocked when a student no longer has enough stars
 
 Mutation requests require `Idempotency-Key` header.
 

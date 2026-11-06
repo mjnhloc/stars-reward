@@ -5,8 +5,6 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-import org.hibernate.annotations.Immutable;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -18,10 +16,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /*
- * Insert only, scores are written by the score import process
+ * Scores are written by the score import process. Score values never change,
+ * a reverted import only marks its scores as voided
  */
 @Entity
-@Immutable
 @Table(name = "student_scores")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -61,6 +59,12 @@ public class StudentScoreEntity {
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
+    @Column(name = "voided_at")
+    private OffsetDateTime voidedAt;
+
+    @Column(name = "voided_by")
+    private UUID voidedBy;
+
     public static StudentScoreEntity create(
         UUID studentId,
         UUID classId,
@@ -84,5 +88,10 @@ public class StudentScoreEntity {
         score.externalRowId = externalRowId;
         score.createdAt = OffsetDateTime.now();
         return score;
+    }
+
+    public void voidBy(UUID actorId) {
+        this.voidedAt = OffsetDateTime.now();
+        this.voidedBy = actorId;
     }
 }

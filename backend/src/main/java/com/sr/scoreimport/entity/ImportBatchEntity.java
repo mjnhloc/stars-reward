@@ -49,6 +49,12 @@ public class ImportBatchEntity {
     @Column(name = "error_count", nullable = false)
     private int errorCount;
 
+    @Column(name = "reverted_at")
+    private OffsetDateTime revertedAt;
+
+    @Column(name = "reverted_by")
+    private UUID revertedBy;
+
     public static ImportBatchEntity start(String sourceSheetId, UUID createdBy) {
         ImportBatchEntity batch = new ImportBatchEntity();
         batch.sourceSheetId = sourceSheetId;
@@ -56,5 +62,11 @@ public class ImportBatchEntity {
         batch.startedAt = OffsetDateTime.now();
         batch.createdBy = createdBy;
         return batch;
+    }
+
+    public void revert(UUID actorId) {
+        this.status = "REVERTED";
+        this.revertedAt = OffsetDateTime.now();
+        this.revertedBy = actorId;
     }
 }

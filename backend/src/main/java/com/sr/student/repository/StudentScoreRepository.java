@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.sr.scoreimport.dto.response.ImportBatchClass;
+import com.sr.scoreimport.dto.response.ImportBatchSummary;
 import com.sr.student.dto.response.StudentScoreResponse;
 import com.sr.student.entity.StudentScoreEntity;
 
@@ -25,6 +27,7 @@ public interface StudentScoreRepository extends JpaRepository<StudentScoreEntity
         )
         FROM StudentScoreEntity s
         WHERE s.studentId = :studentId
+            AND s.voidedAt IS NULL
         ORDER BY
             s.assessmentDate DESC,
             s.createdAt DESC
@@ -34,5 +37,39 @@ public interface StudentScoreRepository extends JpaRepository<StudentScoreEntity
         UUID studentId
     );
 
-    List<StudentScoreEntity> findByStudentIdIn(Collection<UUID> studentIds);
+    List<StudentScoreEntity> findByStudentIdInAndVoidedAtIsNull(Collection<UUID> studentIds);
+
+    List<StudentScoreEntity> findByImportBatchIdAndVoidedAtIsNull(UUID importBatchId);
+
+    /*
+     * Number of sessions, students and stars of every import batch. Voided scores
+     * are counted too, so that a reverted import still shows what it imported
+     */
+    @Query("""
+        SELECT new com.sr.scoreimport.dto.response.ImportBatchSummary(
+            s.importBatchId,
+            COUNT(s),
+            COUNT(DISTINCT s.studentId),
+            COALESCE(SUM(s.awardedStars), 0L)
+        )
+        FROM StudentScoreEntity s
+        WHERE s.importBatchId IN :batchIds
+        GROUP BY s.importBatchId
+        """)
+    List<ImportBatchSummary> summarizeBatches(@Param("batchIds") Collection<UUID> batchIds);
+
+    /*
+     * Classes of every import batch
+     */
+    @Query("""
+        SELECT DISTINCT new com.sr.scoreimport.dto.response.ImportBatchClass(
+            s.importBatchId,
+            c.name
+        )
+        FROM StudentScoreEntity s
+        JOIN ClassEntity c
+            ON c.id = s.classId
+        WHERE s.importBatchId IN :batchIds
+        """)
+    List<ImportBatchClass> findBatchClasses(@Param("batchIds") Collection<UUID> batchIds);
 }

@@ -28,6 +28,10 @@ export function useImportScores() {
             queryClient.invalidateQueries({
                 queryKey: ["student-transactions"],
             });
+
+            queryClient.invalidateQueries({
+                queryKey: ["score-imports"],
+            });
         },
     });
 }

@@ -1,5 +1,6 @@
 package com.sr.student.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,6 +16,8 @@ import com.sr.student.entity.StarTransactionEntity;
 public interface StarTransactionRepository extends JpaRepository<StarTransactionEntity, UUID> {
 
     Optional<StarTransactionEntity> findByIdempotencyKey(String idempotencyKey);
+
+    List<StarTransactionEntity> findByScoreIdInAndTransactionType(Collection<UUID> scoreIds, String transactionType);
 
     /*
      * Transaction history of a student, newest first

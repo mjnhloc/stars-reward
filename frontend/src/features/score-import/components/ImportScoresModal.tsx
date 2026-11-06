@@ -12,6 +12,8 @@ import {
 
 import { useImportScores } from "../hooks/useImportScores";
 import { usePreviewScoreImport } from "../hooks/usePreviewScoreImport";
+import { useScoreImports } from "../hooks/useScoreImports";
+import { ImportHistory } from "./ImportHistory";
 
 import { formatDate, formatScore } from "../../../common/func/common.func";
 import type {
@@ -23,6 +25,8 @@ type Props = {
     onClose: () => void;
 };
 
+type ModalTab = "upload" | "history";
+
 const STATUS_LABELS: Record<ImportSessionStatus, string> = {
     NEW: "Mới",
     EXISTS: "Đã nhập",
@@ -30,6 +34,8 @@ const STATUS_LABELS: Record<ImportSessionStatus, string> = {
 };
 
 export function ImportScoresModal({ onClose }: Props) {
+    const [activeTab, setActiveTab] = useState<ModalTab>("upload");
+
     const [file, setFile] = useState<File | null>(null);
 
     const [isDragging, setIsDragging] = useState(false);
@@ -41,6 +47,8 @@ export function ImportScoresModal({ onClose }: Props) {
     const previewMutation = usePreviewScoreImport();
 
     const importMutation = useImportScores();
+
+    const imports = useScoreImports();
 
     const preview = previewMutation.data;
 
@@ -129,7 +137,47 @@ export function ImportScoresModal({ onClose }: Props) {
                     </button>
                 </div>
 
-                {result ? (
+                <div className="profile-tabs import-tabs" role="tablist">
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === "upload"}
+                        className={activeTab === "upload" ? "active" : ""}
+                        disabled={busy}
+                        onClick={() => setActiveTab("upload")}
+                    >
+                        Nhập file mới
+                    </button>
+
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === "history"}
+                        className={activeTab === "history" ? "active" : ""}
+                        disabled={busy}
+                        onClick={() => setActiveTab("history")}
+                    >
+                        Lịch sử nhập
+                        {imports.data && ` (${imports.data.length})`}
+                    </button>
+                </div>
+
+                {activeTab === "history" ? (
+                    <>
+                        <p className="import-formula">
+                            Hoàn tác một lần nhập sẽ hủy điểm và trừ lại số sao
+                            đã cộng, sau đó có thể upload lại file.
+                        </p>
+
+                        <ImportHistory />
+
+                        <div className="actions">
+                            <button type="button" onClick={onClose}>
+                                Đóng
+                            </button>
+                        </div>
+                    </>
+                ) : result ? (
                     /* step 3: done */
                     <>
                         <div className="import-success" role="status">
@@ -152,6 +200,14 @@ export function ImportScoresModal({ onClose }: Props) {
                                 onClick={chooseAnotherFile}
                             >
                                 Nhập file khác
+                            </button>
+
+                            <button
+                                type="button"
+                                className="secondary"
+                                onClick={() => setActiveTab("history")}
+                            >
+                                Xem lịch sử nhập
                             </button>
 
                             <button type="button" onClick={onClose}>

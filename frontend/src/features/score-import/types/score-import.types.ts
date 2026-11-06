@@ -56,3 +56,43 @@ export type ScoreImportResult = {
     students: number;
     skippedSessions: number;
 };
+
+export type ImportBatchStatus = "COMPLETED" | "REVERTED";
+
+export type ImportBatch = {
+    id: string;
+    fileName: string;
+    status: ImportBatchStatus;
+    importedAt: string;
+    importedBy: string | null;
+    sessionCount: number;
+    studentCount: number;
+    awardedStars: number;
+    classNames: string[];
+    revertedAt: string | null;
+    revertedBy: string | null;
+};
+
+export type ImportRevertStudent = {
+    studentCode: string;
+    fullName: string;
+    starsToReverse: number;
+    currentBalance: number;
+    enoughBalance: boolean;
+};
+
+export type ImportRevertPreview = {
+    batchId: string;
+    fileName: string;
+    sessionCount: number;
+    starsToReverse: number;
+    students: ImportRevertStudent[];
+    canRevert: boolean;
+};
+
+export type ScoreImportRevertResult = {
+    batchId: string;
+    voidedSessions: number;
+    reversedStars: number;
+    students: number;
+};

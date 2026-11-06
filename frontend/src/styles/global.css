@@ -1497,3 +1497,122 @@ td {
         grid-template-columns: 1fr 1fr;
     }
 }
+
+.import-tabs {
+    margin: 18px 0 4px;
+}
+
+.import-tabs button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.import-history {
+    margin-top: 14px;
+}
+
+.import-history .score-item.reverted {
+    background: #f8fafc;
+}
+
+.import-history .score-item-header strong {
+    word-break: break-all;
+}
+
+.import-batch-status {
+    flex: 0 0 auto;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 11px !important;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.import-batch-status.completed {
+    color: #087f5b !important;
+    background: #ecfdf3;
+}
+
+.import-batch-status.reverted {
+    color: #697386 !important;
+    background: #f1f4f8;
+}
+
+.import-batch-footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.import-batch-footer .transaction-meta {
+    line-height: 1.6;
+}
+
+.secondary-action.revert-action {
+    min-height: 34px;
+    color: #b42318;
+    background: #fff7f6;
+    border-color: #f0b8b3;
+}
+
+.secondary-action.revert-action svg {
+    width: 15px;
+    height: 15px;
+}
+
+.revert-modal {
+    width: min(560px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+}
+
+.revert-modal > p {
+    color: #344054;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.revert-students {
+    max-height: 240px;
+    overflow: auto;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    border: 1px solid #edf0f4;
+    border-radius: 12px;
+}
+
+.revert-students li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 12px;
+    font-size: 13px;
+}
+
+.revert-students li + li {
+    border-top: 1px solid #edf0f4;
+}
+
+.revert-students li > span:last-child {
+    color: #c92a2a;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.revert-students small {
+    color: #7a8495;
+    font-weight: 400;
+}
+
+.revert-students li.not-enough {
+    color: #b42318;
+    background: #fff7f6;
+}
+
+.revert-students li.not-enough small {
+    color: #b42318;
+    font-weight: 650;
+}
