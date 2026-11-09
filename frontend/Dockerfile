@@ -16,7 +16,10 @@ RUN npm run build
 
 FROM nginx:1.29-alpine
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# default for docker-compose; on Railway set BACKEND_URL to the backend private domain
+ENV BACKEND_URL=http://backend:8080
+
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 COPY --from=build /app/dist /usr/share/nginx/html
 

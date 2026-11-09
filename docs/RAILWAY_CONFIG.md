@@ -1,0 +1,13 @@
+<!-- Variables -->
+
+SPRING_DATASOURCE_URL=jdbc:postgresql://${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}
+SPRING_DATASOURCE_USERNAME=${{Postgres.PGUSER}}
+SPRING_DATASOURCE_PASSWORD=${{Postgres.PGPASSWORD}}
+SPRING_DATA_REDIS_HOST=${{Redis.REDISHOST}}
+SPRING_DATA_REDIS_PORT=${{Redis.REDISPORT}}
+SPRING_DATA_REDIS_PASSWORD=${{Redis.REDISPASSWORD}}
+JWT_SECRET=<chuỗi ngẫu nhiên dài, KHÁC với máy local>
+APP_CORS_ALLOWED_ORIGINS=https://<domain-frontend>.up.railway.app
+APP_SECURITY_REFRESH_TOKEN_SECURE=true
+
+BACKEND_URL=http://${{backend.RAILWAY_PRIVATE_DOMAIN}}:8080
