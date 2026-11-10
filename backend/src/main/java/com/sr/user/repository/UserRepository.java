@@ -1,5 +1,6 @@
 package com.sr.user.repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,4 +38,19 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
             AND u.active = TRUE
         """)
     Optional<UserEntity> findActiveForUpdate(@Param("userId") UUID userId);
+
+    List<UserEntity> findAllByOrderByCreatedAtAsc();
+
+    long countByRoleAndActiveTrue(String role);
+
+    /*
+     * SELECT ... FOR UPDATE, also for locked users
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT u
+        FROM UserEntity u
+        WHERE u.id = :userId
+        """)
+    Optional<UserEntity> findForUpdate(@Param("userId") UUID userId);
 }

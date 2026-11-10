@@ -1,6 +1,8 @@
 import { Star } from "lucide-react";
 import { Navigate } from "react-router-dom";
 
+import logo from "../../../assets/khai-minh-logo.png";
+
 import { LoadingScreen } from "../../../common/ui/LoadingScreen";
 import { LoginForm } from "../components/LoginForm";
 import { useAuth } from "../hooks/useAuth";
@@ -43,6 +45,8 @@ export function LoginPage() {
 
             <section className="login-content">
                 <div className="login-card">
+                    <img src={logo} alt="Khai Minh" className="login-logo" />
+
                     <p className="login-eyebrow">Chào mừng trở lại</p>
 
                     <h2>Đăng nhập</h2>

@@ -16,6 +16,10 @@ export function useDeleteClass() {
             queryClient.invalidateQueries({
                 queryKey: ["dashboard"],
             });
+
+            queryClient.invalidateQueries({
+                queryKey: ["trash"],
+            });
         },
     });
 }

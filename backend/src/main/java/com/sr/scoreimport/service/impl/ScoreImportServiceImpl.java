@@ -38,6 +38,7 @@ import com.sr.scoreimport.dto.response.ImportBatchRow;
 import com.sr.scoreimport.dto.response.ImportBatchSummary;
 import com.sr.scoreimport.dto.response.ImportClassResponse;
 import com.sr.scoreimport.dto.response.ImportIssueResponse;
+import com.sr.scoreimport.dto.response.ImportNewStudentResponse;
 import com.sr.scoreimport.dto.response.ImportRevertPreviewResponse;
 import com.sr.scoreimport.dto.response.ImportRevertStudentResponse;
 import com.sr.scoreimport.dto.response.ImportSessionResponse;
@@ -55,6 +56,7 @@ import com.sr.scoreimport.repository.ImportBatchRepository;
 import com.sr.scoreimport.service.ScoreCalculator;
 import com.sr.scoreimport.service.ScoreImportService;
 import com.sr.scoreimport.service.ScoreSheetParser;
+import com.sr.student.dto.request.CreateStudentRequest;
 import com.sr.student.entity.ClassEnrollmentEntity;
 import com.sr.student.entity.StarTransactionEntity;
 import com.sr.student.entity.StudentEntity;
@@ -65,6 +67,7 @@ import com.sr.student.repository.StarTransactionRepository;
 import com.sr.student.repository.StudentRepository;
 import com.sr.student.repository.StudentScoreRepository;
 import com.sr.student.repository.StudentStarBalanceRepository;
+import com.sr.student.service.StudentService;
 import com.sr.user.service.UserService;
 
 @Service
@@ -85,6 +88,7 @@ public class ScoreImportServiceImpl implements ScoreImportService {
     private final ImportBatchRepository importBatchRepository;
     private final AuditLogService auditLogService;
     private final UserService userService;
+    private final StudentService studentService;
 
     public ScoreImportServiceImpl(
         ScoreSheetParser scoreSheetParser,
@@ -97,7 +101,8 @@ public class ScoreImportServiceImpl implements ScoreImportService {
         StarTransactionRepository starTransactionRepository,
         ImportBatchRepository importBatchRepository,
         AuditLogService auditLogService,
-        UserService userService
+        UserService userService,
+        StudentService studentService
     ) {
         this.scoreSheetParser = scoreSheetParser;
         this.scoreCalculator = scoreCalculator;
@@ -110,10 +115,12 @@ public class ScoreImportServiceImpl implements ScoreImportService {
         this.importBatchRepository = importBatchRepository;
         this.auditLogService = auditLogService;
         this.userService = userService;
+        this.studentService = studentService;
     }
 
     /*
-     * A new score that will be inserted
+     * A new score that will be inserted. studentId is null for a student that is
+     * created by the import, it is found again by studentCode
      */
     private record PlannedScore(
         UUID studentId,
@@ -126,11 +133,27 @@ public class ScoreImportServiceImpl implements ScoreImportService {
         int awardedStars
     ) {}
 
+    /*
+     * A student of the file that the user chose to add
+     */
+    private record PlannedStudent(
+        String studentCode,
+        String fullName,
+        UUID classId,
+        LocalDate startedAt
+    ) {}
+
     private record Analysis(
         String fileName,
         ScoreImportPreviewResponse preview,
-        List<PlannedScore> plannedScores
+        List<PlannedScore> plannedScores,
+        List<PlannedStudent> plannedStudents
     ) {}
+
+    /*
+     * Final score and stars of one session
+     */
+    private record CalculatedSession(BigDecimal finalScore, int awardedStars) {}
 
     /*
      * What a revert takes back: active scores and their star transactions
@@ -149,7 +172,7 @@ public class ScoreImportServiceImpl implements ScoreImportService {
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional(readOnly = true)
     public ScoreImportPreviewResponse preview(MultipartFile file) {
-        return analyse(file).preview();
+        return analyse(file, null).preview();
     }
 
     /*
@@ -159,15 +182,33 @@ public class ScoreImportServiceImpl implements ScoreImportService {
     @Override
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    public ScoreImportResultResponse importScores(MultipartFile file) {
+    public ScoreImportResultResponse importScores(MultipartFile file, List<String> createStudentCodes) {
         UUID actorId = userService.getUserId();
 
-        Analysis analysis = analyse(file);
+        Set<String> createCodes = createStudentCodes == null
+            ? Set.of()
+            : createStudentCodes.stream().map(this::normalizeCode).collect(Collectors.toSet());
+
+        Analysis analysis = analyse(file, createCodes);
         List<PlannedScore> plannedScores = analysis.plannedScores();
         ImportTotalsResponse totals = analysis.preview().totals();
 
-        if (plannedScores.isEmpty()) {
+        if (plannedScores.isEmpty() && analysis.plannedStudents().isEmpty()) {
             throw new IllegalArgumentException("Không có buổi điểm mới nào để nhập");
+        }
+
+        /*
+         * Add the chosen new students with the existing create function (student,
+         * enrollment, balance and audit log) in the same transaction
+         */
+        Map<String, UUID> createdStudentIds = new LinkedHashMap<>();
+
+        for (PlannedStudent planned : analysis.plannedStudents()) {
+            UUID studentId = studentService.createStudent(
+                new CreateStudentRequest(planned.studentCode(), planned.fullName(), planned.classId(), planned.startedAt())
+            ).id();
+
+            createdStudentIds.put(planned.studentCode(), studentId);
         }
 
         ImportBatchEntity batch = importBatchRepository.save(ImportBatchEntity.start(analysis.fileName(), actorId));
@@ -176,7 +217,7 @@ public class ScoreImportServiceImpl implements ScoreImportService {
 
         List<StudentScoreEntity> scores = plannedScores.stream()
             .map(planned -> StudentScoreEntity.create(
-                planned.studentId(),
+                planned.studentId() != null ? planned.studentId() : createdStudentIds.get(planned.studentCode()),
                 planned.classId(),
                 planned.homeworkScore(),
                 planned.testScore(),
@@ -253,7 +294,7 @@ public class ScoreImportServiceImpl implements ScoreImportService {
         batch.setStatus("COMPLETED");
         batch.setCompletedAt(OffsetDateTime.now());
 
-        int studentCount = (int) plannedScores.stream().map(PlannedScore::studentId).distinct().count();
+        int studentCount = (int) scores.stream().map(StudentScoreEntity::getStudentId).distinct().count();
 
         auditLogService.record(
             new AuditLogCommand(
@@ -275,7 +316,9 @@ public class ScoreImportServiceImpl implements ScoreImportService {
                     "students",
                     studentCount,
                     "errors",
-                    totals.errors()
+                    totals.errors(),
+                    "createdStudents",
+                    createdStudentIds.size()
                 )
             )
         );
@@ -285,7 +328,8 @@ public class ScoreImportServiceImpl implements ScoreImportService {
             plannedScores.size(),
             awardedStars,
             studentCount,
-            totals.skippedSessions()
+            totals.skippedSessions(),
+            createdStudentIds.size()
         );
     }
 
@@ -576,9 +620,10 @@ public class ScoreImportServiceImpl implements ScoreImportService {
     }
 
     /*
-     * Parse the file and match classes, students and already imported sessions
+     * Parse the file and match classes, students and already imported sessions.
+     * createCodes are the new students chosen by the user, null for a preview
      */
-    private Analysis analyse(MultipartFile file) {
+    private Analysis analyse(MultipartFile file, Set<String> createCodes) {
         String fileName = validateFile(file);
 
         ParsedSheet sheet;
@@ -627,7 +672,10 @@ public class ScoreImportServiceImpl implements ScoreImportService {
         List<ImportClassResponse> classes = new ArrayList<>();
         List<ImportStudentResponse> students = new ArrayList<>();
         List<PlannedScore> plannedScores = new ArrayList<>();
+        List<ImportNewStudentResponse> newStudents = new ArrayList<>();
+        List<PlannedStudent> plannedStudents = new ArrayList<>();
         Set<String> seenStudentCodes = new HashSet<>();
+        LocalDate today = LocalDate.now();
 
         int skippedSessions = 0;
         int starsToAward = 0;
@@ -670,13 +718,78 @@ public class ScoreImportServiceImpl implements ScoreImportService {
                 StudentEntity student = studentsByCode.get(studentCode);
 
                 if (student == null) {
-                    issues.add(
-                        ImportIssueResponse.error(
-                            rowLocation,
-                            "Không tìm thấy học sinh %s%s trên hệ thống. Hãy thêm học sinh trước rồi upload lại"
-                                .formatted(studentCode, nameSuffix)
+                    /*
+                     * Not on the system yet: the user can choose to add it
+                     */
+                    String problem = newStudentProblem(parsedStudent, today);
+
+                    List<ImportSessionResponse> sessions = new ArrayList<>();
+                    int studentStars = 0;
+
+                    for (ParsedSession session : parsedStudent.sessions()) {
+                        CalculatedSession calculated = calculate(session);
+                        studentStars += calculated.awardedStars();
+                        sessions.add(toSessionResponse(session, calculated, "NEW"));
+                    }
+
+                    newStudents.add(
+                        new ImportNewStudentResponse(
+                            studentCode,
+                            parsedStudent.fullName(),
+                            parsedStudent.startedAt(),
+                            block.classCode(),
+                            classEntity.getName(),
+                            sessions.size(),
+                            studentStars,
+                            sessions,
+                            problem
                         )
                     );
+
+                    if (problem != null) {
+                        issues.add(
+                            ImportIssueResponse.error(
+                                rowLocation,
+                                "Không thể thêm học sinh mới %s%s: %s".formatted(studentCode, nameSuffix, problem)
+                            )
+                        );
+                        continue;
+                    }
+
+                    if (createCodes == null) {
+                        continue;
+                    }
+
+                    if (!createCodes.contains(studentCode)) {
+                        issues.add(
+                            ImportIssueResponse.warning(
+                                rowLocation,
+                                "Học sinh mới %s%s không được chọn để thêm nên bị bỏ qua".formatted(studentCode, nameSuffix)
+                            )
+                        );
+                        continue;
+                    }
+
+                    plannedStudents.add(
+                        new PlannedStudent(studentCode, parsedStudent.fullName(), classEntity.getId(), parsedStudent.startedAt())
+                    );
+
+                    for (ParsedSession session : parsedStudent.sessions()) {
+                        CalculatedSession calculated = calculate(session);
+
+                        plannedScores.add(
+                            new PlannedScore(
+                                null,
+                                classEntity.getId(),
+                                studentCode,
+                                session.assessmentDate(),
+                                session.homeworkScore(),
+                                session.testScore(),
+                                calculated.finalScore(),
+                                calculated.awardedStars()
+                            )
+                        );
+                    }
                     continue;
                 }
 
@@ -684,7 +797,8 @@ public class ScoreImportServiceImpl implements ScoreImportService {
                     issues.add(
                         ImportIssueResponse.error(
                             rowLocation,
-                            "Học sinh %s%s đã bị xóa khỏi hệ thống".formatted(studentCode, nameSuffix)
+                            "Học sinh %s%s đã bị xóa khỏi hệ thống. Hãy khôi phục học sinh trong Thùng rác rồi upload lại"
+                                .formatted(studentCode, nameSuffix)
                         )
                     );
                     continue;
@@ -719,12 +833,9 @@ public class ScoreImportServiceImpl implements ScoreImportService {
                 int studentStars = 0;
 
                 for (ParsedSession session : parsedStudent.sessions()) {
-                    BigDecimal exactFinalScore = scoreCalculator.exactFinalScore(
-                        session.homeworkScore(),
-                        session.testScore()
-                    );
-                    BigDecimal finalScore = scoreCalculator.storedFinalScore(exactFinalScore);
-                    int awardedStars = scoreCalculator.awardedStars(exactFinalScore);
+                    CalculatedSession calculated = calculate(session);
+                    BigDecimal finalScore = calculated.finalScore();
+                    int awardedStars = calculated.awardedStars();
 
                     StudentScoreEntity existing = studentScores.get(session.assessmentDate());
 
@@ -768,16 +879,7 @@ public class ScoreImportServiceImpl implements ScoreImportService {
                         );
                     }
 
-                    sessions.add(
-                        new ImportSessionResponse(
-                            session.assessmentDate(),
-                            session.homeworkScore(),
-                            session.testScore(),
-                            finalScore,
-                            awardedStars,
-                            status
-                        )
-                    );
+                    sessions.add(toSessionResponse(session, calculated, status));
                 }
 
                 skippedSessions += studentSkippedSessions;
@@ -804,11 +906,51 @@ public class ScoreImportServiceImpl implements ScoreImportService {
             sheet.sheetName(),
             classes,
             students,
+            newStudents,
             new ImportTotalsResponse(students.size(), plannedScores.size(), skippedSessions, starsToAward, errors),
             issues
         );
 
-        return new Analysis(fileName, preview, plannedScores);
+        return new Analysis(fileName, preview, plannedScores, plannedStudents);
+    }
+
+    /*
+     * Why a student of the file cannot be added, null when it can
+     */
+    private String newStudentProblem(ParsedStudent student, LocalDate today) {
+        if (student.fullName() == null) {
+            return "thiếu họ và tên";
+        }
+
+        if (student.startedAt() == null) {
+            return "không có ngày bắt đầu học, học sinh này sẽ không được thêm";
+        }
+
+        if (student.startedAt().isAfter(today)) {
+            return "ngày bắt đầu học %s sau hôm nay".formatted(DISPLAY_DATE.format(student.startedAt()));
+        }
+
+        return null;
+    }
+
+    private CalculatedSession calculate(ParsedSession session) {
+        BigDecimal exactFinalScore = scoreCalculator.exactFinalScore(session.homeworkScore(), session.testScore());
+
+        return new CalculatedSession(
+            scoreCalculator.storedFinalScore(exactFinalScore),
+            scoreCalculator.awardedStars(exactFinalScore)
+        );
+    }
+
+    private ImportSessionResponse toSessionResponse(ParsedSession session, CalculatedSession calculated, String status) {
+        return new ImportSessionResponse(
+            session.assessmentDate(),
+            session.homeworkScore(),
+            session.testScore(),
+            calculated.finalScore(),
+            calculated.awardedStars(),
+            status
+        );
     }
 
     private String validateFile(MultipartFile file) {

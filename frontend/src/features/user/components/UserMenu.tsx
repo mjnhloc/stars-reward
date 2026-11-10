@@ -1,4 +1,4 @@
-import { LogOut, Settings } from "lucide-react";
+import { LogOut, Settings, UsersRound } from "lucide-react";
 
 type Props = {
     displayName?: string;
@@ -6,6 +6,8 @@ type Props = {
     isOpen: boolean;
     onToggle: () => void;
     onProfileClick: () => void;
+    // only given to admins
+    onManageUsersClick?: () => void;
     onLogout: () => void;
 };
 
@@ -15,6 +17,7 @@ export function UserMenu({
     isOpen,
     onToggle,
     onProfileClick,
+    onManageUsersClick,
     onLogout,
 }: Props) {
     return (
@@ -41,6 +44,13 @@ export function UserMenu({
                         <Settings aria-hidden="true" />
                         Đổi mật khẩu
                     </button>
+
+                    {onManageUsersClick && (
+                        <button type="button" onClick={onManageUsersClick}>
+                            <UsersRound aria-hidden="true" />
+                            Quản lý người dùng
+                        </button>
+                    )}
 
                     <div className="user-menu-divider" />
 

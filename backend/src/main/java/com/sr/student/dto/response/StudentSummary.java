@@ -1,5 +1,6 @@
 package com.sr.student.dto.response;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 public record StudentSummary(
@@ -8,5 +9,6 @@ public record StudentSummary(
         String fullName,
         UUID classId,
         String className,
-        int totalStars
+        int totalStars,
+        LocalDate startedAt
 ) {}

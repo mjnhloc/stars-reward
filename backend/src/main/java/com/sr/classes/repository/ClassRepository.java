@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -58,4 +59,22 @@ public interface ClassRepository extends JpaRepository<ClassEntity, UUID> {
     boolean existsByCode(String code);
 
     boolean existsByCodeAndIdNot(String code, UUID id);
+
+    List<ClassEntity> findByArchivedAtIsNotNullOrderByArchivedAtDesc();
+
+    /*
+     * SELECT ... FOR UPDATE of a class in the trash
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT c
+        FROM ClassEntity c
+        WHERE c.id = :classId
+            AND c.archivedAt IS NOT NULL
+        """)
+    Optional<ClassEntity> findArchivedForUpdate(@Param("classId") UUID classId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "DELETE FROM classes WHERE id = :classId", nativeQuery = true)
+    int deletePermanently(@Param("classId") UUID classId);
 }

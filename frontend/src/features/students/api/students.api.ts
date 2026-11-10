@@ -4,10 +4,12 @@ import type { StudentTransaction } from "../../star-transactions/types/star-tran
 import type {
     CreateStudentRequest,
     CreateStudentResponse,
+    RestoreStudentRequest,
     Student,
     StudentScore,
     StudentStarsAdjustmentRequest,
     StudentStarsAdjustmentResponse,
+    StudentTrash,
     UpdateStudentRequest,
     UpdateStudentResponse,
 } from "../types/student.types";
@@ -84,4 +86,28 @@ export async function updateStudent(
 
 export async function deleteStudent(studentId: string): Promise<void> {
     await apiClient.delete(`/students/${studentId}`);
+}
+
+export async function getStudentTrash(): Promise<StudentTrash[]> {
+    const response = await apiClient.get<StudentTrash[]>("/students/trash");
+
+    return response.data;
+}
+
+export async function restoreStudent(
+    studentId: string,
+    request: RestoreStudentRequest,
+): Promise<UpdateStudentResponse> {
+    const response = await apiClient.post<UpdateStudentResponse>(
+        `/students/${studentId}/restore`,
+        request,
+    );
+
+    return response.data;
+}
+
+export async function deleteStudentPermanently(
+    studentId: string,
+): Promise<void> {
+    await apiClient.delete(`/students/${studentId}/permanent`);
 }

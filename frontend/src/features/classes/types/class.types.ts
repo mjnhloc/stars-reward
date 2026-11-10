@@ -31,3 +31,12 @@ export type UpdateClassRequest = {
     name: string;
     schoolYear: string;
 };
+
+export type ClassTrash = {
+    id: string;
+    code: string;
+    name: string;
+    schoolYear: string;
+    archivedAt: string;
+    studentCount: number;
+};

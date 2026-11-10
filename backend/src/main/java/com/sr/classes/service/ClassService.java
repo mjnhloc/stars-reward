@@ -7,6 +7,7 @@ import com.sr.classes.dto.request.CreateClassRequest;
 import com.sr.classes.dto.request.UpdateClassRequest;
 import com.sr.classes.dto.response.ClassDetailResponse;
 import com.sr.classes.dto.response.ClassResponse;
+import com.sr.classes.dto.response.ClassTrashResponse;
 import com.sr.classes.dto.response.CreateClassResponse;
 
 public interface ClassService {
@@ -20,4 +21,10 @@ public interface ClassService {
     ClassDetailResponse updateClass(UUID classId, UpdateClassRequest request);
 
     void deleteClass(UUID classId);
+
+    List<ClassTrashResponse> getClassTrash();
+
+    ClassDetailResponse restoreClass(UUID classId);
+
+    void deleteClassPermanently(UUID classId);
 }

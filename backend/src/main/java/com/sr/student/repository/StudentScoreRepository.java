@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -72,4 +73,12 @@ public interface StudentScoreRepository extends JpaRepository<StudentScoreEntity
         WHERE s.importBatchId IN :batchIds
         """)
     List<ImportBatchClass> findBatchClasses(@Param("batchIds") Collection<UUID> batchIds);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "DELETE FROM student_scores WHERE student_id = :studentId", nativeQuery = true)
+    int deleteAllOfStudent(@Param("studentId") UUID studentId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE student_scores SET class_id = NULL WHERE class_id = :classId", nativeQuery = true)
+    int detachClass(@Param("classId") UUID classId);
 }

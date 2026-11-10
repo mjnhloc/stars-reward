@@ -4,6 +4,10 @@ import { Info, X } from "lucide-react";
 
 import { useUpdateStudent } from "../hooks/useUpdateStudent";
 
+import {
+    formatDate,
+    todayInputValue,
+} from "../../../common/func/common.func";
 import type { ClassSummary } from "../../classes/types/class.types";
 import type { Student } from "../types/student.types";
 
@@ -20,14 +24,26 @@ export function EditStudentModal({ student, classes, onClose }: Props) {
 
     const [classId, setClassId] = useState(student.classId);
 
+    const [startedAt, setStartedAt] = useState(student.startedAt);
+
     const mutation = useUpdateStudent();
+
+    const today = todayInputValue();
 
     const isClassChanged = classId !== student.classId;
 
     const isUnchanged =
         studentCode.trim().toUpperCase() === student.studentCode &&
         fullName.trim() === student.fullName &&
-        !isClassChanged;
+        !isClassChanged &&
+        startedAt === student.startedAt;
+
+    function handleClassChange(nextClassId: string) {
+        setClassId(nextClassId);
+
+        // moving to another class starts today by default, back to the current class keeps its date
+        setStartedAt(nextClassId === student.classId ? student.startedAt : today);
+    }
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -39,6 +55,7 @@ export function EditStudentModal({ student, classes, onClose }: Props) {
                     studentCode: studentCode.trim(),
                     fullName: fullName.trim(),
                     classId,
+                    startedAt,
                 },
             });
 
@@ -91,7 +108,9 @@ export function EditStudentModal({ student, classes, onClose }: Props) {
                     Lớp học
                     <select
                         value={classId}
-                        onChange={(event) => setClassId(event.target.value)}
+                        onChange={(event) =>
+                            handleClassChange(event.target.value)
+                        }
                         disabled={mutation.isPending}
                         required
                     >
@@ -109,14 +128,28 @@ export function EditStudentModal({ student, classes, onClose }: Props) {
                     </select>
                 </label>
 
+                <label>
+                    {isClassChanged ? "Ngày vào lớp mới" : "Ngày bắt đầu học"}
+                    <input
+                        type="date"
+                        value={startedAt}
+                        max={today}
+                        onChange={(event) => setStartedAt(event.target.value)}
+                        disabled={mutation.isPending}
+                        required
+                    />
+                </label>
+
                 {isClassChanged && (
                     <div className="redemption-notice">
                         <Info />
 
                         <span>
-                            Học sinh sẽ được chuyển sang lớp mới từ hôm nay. Số
-                            sao ({student.totalStars}) và lịch sử giao dịch được
-                            giữ nguyên.
+                            {startedAt > student.startedAt
+                                ? `Học sinh sẽ được chuyển sang lớp mới từ ngày ${startedAt ? formatDate(startedAt) : ""}.`
+                                : "Học sinh được tính là học lớp mới ngay từ ngày bắt đầu học."}{" "}
+                            Số sao ({student.totalStars}) và lịch sử giao dịch
+                            được giữ nguyên.
                         </span>
                     </div>
                 )}
@@ -144,7 +177,8 @@ export function EditStudentModal({ student, classes, onClose }: Props) {
                             isUnchanged ||
                             !studentCode.trim() ||
                             !fullName.trim() ||
-                            !classId
+                            !classId ||
+                            !startedAt
                         }
                     >
                         {mutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}

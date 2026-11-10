@@ -2,8 +2,9 @@ import axios from "axios";
 import { refreshAccessToken } from "../features/auth/api/auth.api";
 import { tokenStorage } from "../features/auth/services/tokenStorage";
 import { toApiError } from "./apiError";
+import type { TokenResponse } from "../features/auth/types/auth.types";
 
-let refreshPromise: Promise<string> | null = null;
+let refreshPromise: Promise<TokenResponse> | null = null;
 
 export const apiClient = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
@@ -45,18 +46,19 @@ apiClient.interceptors.response.use(
                     refreshPromise = null;
                 });
 
-                const newAccessToken = await refreshPromise;
+                const refreshed = await refreshPromise;
 
-                tokenStorage.set(newAccessToken, false);
+                // keep the token where the remember me choice of the session wants it
+                tokenStorage.set(refreshed.accessToken, refreshed.remember);
 
-                originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+                originalRequest.headers.Authorization = `Bearer ${refreshed.accessToken}`;
 
                 return apiClient(originalRequest);
             } catch {
                 tokenStorage.clear();
                 window.location.replace("/login");
 
-                return Promise.reject(error);
+                return Promise.reject(toApiError(error));
             }
         }
 

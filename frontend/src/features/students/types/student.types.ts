@@ -8,6 +8,7 @@ export type Student = {
     redeemableStars: number;
     redeemableValue: number;
     remainingStars: number;
+    startedAt: string;
 };
 
 export type StudentScore = {
@@ -54,6 +55,7 @@ export type UpdateStudentRequest = {
     studentCode: string;
     fullName: string;
     classId: string;
+    startedAt: string;
 };
 
 export type UpdateStudentResponse = {
@@ -63,4 +65,20 @@ export type UpdateStudentResponse = {
     classId: string;
     className: string;
     totalStars: number;
+    startedAt: string;
+};
+
+export type StudentTrash = {
+    id: string;
+    studentCode: string;
+    fullName: string;
+    lastClassId: string | null;
+    lastClassName: string | null;
+    lastClassArchived: boolean;
+    archivedAt: string;
+    totalStars: number;
+};
+
+export type RestoreStudentRequest = {
+    classId?: string;
 };

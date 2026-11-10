@@ -15,7 +15,7 @@ public interface ScoreImportService {
 
     ScoreImportPreviewResponse preview(MultipartFile file);
 
-    ScoreImportResultResponse importScores(MultipartFile file);
+    ScoreImportResultResponse importScores(MultipartFile file, List<String> createStudentCodes);
 
     List<ImportBatchResponse> getImports();
 

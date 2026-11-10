@@ -7,7 +7,7 @@ import { useStudentTransactions } from "../hooks/useStudentTransactions";
 import { StudentScoreHistory } from "./StudentScoreHistory";
 import { StudentTransactionHistory } from "./StudentTransactionHistory";
 
-import { money } from "../../../common/func/common.func";
+import { formatDate, money } from "../../../common/func/common.func";
 import type { Student } from "../types/student.types";
 
 type StudentDrawerProps = {
@@ -58,7 +58,8 @@ export function StudentDrawer({ student, onClose }: StudentDrawerProps) {
                         <h2 id="student-drawer-title">{student.fullName}</h2>
 
                         <p className="muted">
-                            {student.studentCode} · {student.className}
+                            {student.studentCode} · {student.className} · Bắt
+                            đầu học {formatDate(student.startedAt)}
                         </p>
                     </div>
 

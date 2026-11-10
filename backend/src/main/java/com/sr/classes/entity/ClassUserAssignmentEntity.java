@@ -34,6 +34,14 @@ public class ClassUserAssignmentEntity {
     @Column(name = "can_adjust", nullable = false)
     private boolean canAdjust;
 
+    public static ClassUserAssignmentEntity create(UUID userId, UUID classId, boolean canAdjust) {
+        ClassUserAssignmentEntity assignment = new ClassUserAssignmentEntity();
+        assignment.userId = userId;
+        assignment.classId = classId;
+        assignment.canAdjust = canAdjust;
+        return assignment;
+    }
+
     /*
      * Composite primary key (user_id, class_id)
      */

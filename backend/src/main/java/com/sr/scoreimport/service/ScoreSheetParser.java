@@ -9,6 +9,7 @@ import java.text.Normalizer;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -38,7 +39,7 @@ import com.sr.scoreimport.model.ParsedStudent;
  * - row h - 1: month titles ("THÁNG 7/2026" or a date)
  * - row h: "STT" in column A and the date of every session
  * - row h + 1: class code in column A and "15p" | "BTVN" column pairs
- * - row h + 2...: students (B = student code, C = full name)
+ * - row h + 2...: students (B = student code, C = full name, D = start date)
  * Attendance and average columns are ignored because only "15p" | "BTVN"
  * pairs are read
  */
@@ -50,10 +51,12 @@ public class ScoreSheetParser {
     private static final String CLASS_TITLE_PREFIX = "LỚP";
     private static final String TEST_HEADER = "15P";
     private static final String HOMEWORK_HEADER = "BTVN";
+    private static final String START_DATE_HEADER = "BẮT ĐẦU";
 
     private static final int CLASS_COLUMN = 0;
     private static final int STUDENT_CODE_COLUMN = 1;
     private static final int FULL_NAME_COLUMN = 2;
+    private static final int START_DATE_COLUMN = 3;
 
     private static final Pattern DAY_MONTH = Pattern.compile("(\\d{1,2})/(\\d{1,2})(?:/(\\d{2,4}))?");
     private static final Pattern MONTH_YEAR = Pattern.compile("(\\d{1,2})\\s*/\\s*(\\d{4})");
@@ -175,6 +178,12 @@ public class ScoreSheetParser {
         List<ParsedStudent> students = new ArrayList<>();
         Set<SessionColumn> undatedColumnsWithScores = new LinkedHashSet<>();
 
+        /*
+         * the start date is read only when the column is really "Ngày bắt đầu học"
+         */
+        boolean hasStartDateColumn = dateRow != null
+            && normalize(text(dateRow.getCell(START_DATE_COLUMN))).contains(START_DATE_HEADER);
+
         for (int rowIndex = headerRow + 2; rowIndex <= endRow; rowIndex++) {
             Row row = sheet.getRow(rowIndex);
 
@@ -231,7 +240,9 @@ public class ScoreSheetParser {
                 sessions.add(new ParsedSession(column.date(), homeworkScore, testScore));
             }
 
-            students.add(new ParsedStudent(rowIndex + 1, studentCode, fullName, sessions));
+            LocalDate startedAt = hasStartDateColumn ? startDate(row.getCell(START_DATE_COLUMN), sessions) : null;
+
+            students.add(new ParsedStudent(rowIndex + 1, studentCode, fullName, startedAt, sessions));
         }
 
         for (SessionColumn column : undatedColumnsWithScores) {
@@ -362,6 +373,54 @@ public class ScoreSheetParser {
 
         try {
             return LocalDate.of(year < 100 ? 2000 + year : year, month, day);
+        } catch (DateTimeException exception) {
+            return null;
+        }
+    }
+
+    /*
+     * Start date is a real date, "dd/MM/yyyy" or "dd/MM". Without a year it is the
+     * latest such date not after the first session of the student (or today)
+     */
+    private LocalDate startDate(Cell cell, List<ParsedSession> sessions) {
+        Object value = value(cell);
+
+        if (value instanceof LocalDate date) {
+            return date;
+        }
+
+        if (value instanceof BigDecimal number && DateUtil.isValidExcelDate(number.doubleValue())
+            && number.intValue() > 30000) {
+            return DateUtil.getLocalDateTime(number.doubleValue()).toLocalDate();
+        }
+
+        if (!(value instanceof String text)) {
+            return null;
+        }
+
+        Matcher matcher = DAY_MONTH.matcher(text);
+
+        if (!matcher.matches()) {
+            return null;
+        }
+
+        int day = Integer.parseInt(matcher.group(1));
+        int month = Integer.parseInt(matcher.group(2));
+
+        try {
+            if (matcher.group(3) != null) {
+                int year = Integer.parseInt(matcher.group(3));
+                return LocalDate.of(year < 100 ? 2000 + year : year, month, day);
+            }
+
+            LocalDate reference = sessions.stream()
+                .map(ParsedSession::assessmentDate)
+                .min(Comparator.naturalOrder())
+                .orElse(LocalDate.now());
+
+            LocalDate candidate = LocalDate.of(reference.getYear(), month, day);
+
+            return candidate.isAfter(reference) ? candidate.minusYears(1) : candidate;
         } catch (DateTimeException exception) {
             return null;
         }

@@ -1,5 +1,6 @@
 package com.sr.student.dto.response;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 public record StudentResponse(
@@ -11,5 +12,6 @@ public record StudentResponse(
         int totalStars,
         int redeemableStars,
         long redeemableValue,
-        int remainingStars
+        int remainingStars,
+        LocalDate startedAt
 ) {}

@@ -34,6 +34,7 @@ import { useAdjustStudentStars } from "../../students/hooks/useAdjustStudentStar
 import { useDeleteStudent } from "../../students/hooks/useDeleteStudent";
 import { useStudents } from "../../students/hooks/useStudents";
 import type { Student } from "../../students/types/student.types";
+import { TrashModal } from "../components/TrashModal";
 import { useDashboard } from "../hooks/useDashboard";
 
 export function DashboardPage() {
@@ -83,6 +84,8 @@ export function DashboardPage() {
 
     const [isImportScoresOpen, setIsImportScoresOpen] = useState(false);
 
+    const [isTrashOpen, setIsTrashOpen] = useState(false);
+
     const [isEditClassOpen, setIsEditClassOpen] = useState(false);
 
     const [isDeleteClassOpen, setIsDeleteClassOpen] = useState(false);
@@ -102,9 +105,46 @@ export function DashboardPage() {
     return (
         <div>
             <main>
-                <h1>Tổng quan điểm thưởng</h1>
+                <div className="page-header">
+                    <div>
+                        <h1>Tổng quan điểm thưởng</h1>
 
-                <p className="muted">Dữ liệu được lấy từ sổ cái giao dịch</p>
+                        <p className="muted">
+                            Dữ liệu được lấy từ sổ cái giao dịch
+                        </p>
+                    </div>
+
+                    {isAdmin && (
+                        <div className="page-actions">
+                            <button
+                                type="button"
+                                className="secondary-action"
+                                onClick={() => setIsImportScoresOpen(true)}
+                            >
+                                <FileSpreadsheet />
+                                Nhập điểm Excel
+                            </button>
+
+                            <button
+                                type="button"
+                                className="secondary-action"
+                                onClick={() => setIsTrashOpen(true)}
+                            >
+                                <Trash2 />
+                                Thùng rác
+                            </button>
+
+                            <button
+                                type="button"
+                                className="secondary-action"
+                                onClick={() => setIsCreateClassOpen(true)}
+                            >
+                                <FolderPlus />
+                                Thêm lớp
+                            </button>
+                        </div>
+                    )}
+                </div>
 
                 {dashboard.isLoading ? (
                     <p>Đang tải...</p>
@@ -189,28 +229,6 @@ export function DashboardPage() {
                                                 </button>
                                             </>
                                         )}
-
-                                        <button
-                                            type="button"
-                                            className="secondary-action"
-                                            onClick={() =>
-                                                setIsImportScoresOpen(true)
-                                            }
-                                        >
-                                            <FileSpreadsheet />
-                                            Nhập điểm Excel
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            className="secondary-action"
-                                            onClick={() =>
-                                                setIsCreateClassOpen(true)
-                                            }
-                                        >
-                                            <FolderPlus />
-                                            Thêm lớp
-                                        </button>
 
                                         <button
                                             type="button"
@@ -519,6 +537,13 @@ export function DashboardPage() {
             {isImportScoresOpen && (
                 <ImportScoresModal
                     onClose={() => setIsImportScoresOpen(false)}
+                />
+            )}
+
+            {isTrashOpen && (
+                <TrashModal
+                    classes={classes.data ?? []}
+                    onClose={() => setIsTrashOpen(false)}
                 />
             )}
             {/* create a new class modal */}

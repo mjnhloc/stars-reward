@@ -39,8 +39,8 @@ export async function changePassword(
     return response.data;
 }
 
-export async function refreshAccessToken(): Promise<string> {
+export async function refreshAccessToken(): Promise<TokenResponse> {
     const response = await apiClient.post<TokenResponse>("/auth/refresh");
 
-    return response.data.accessToken;
+    return response.data;
 }

@@ -1,5 +1,6 @@
 package com.sr.student.dto.request;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 import jakarta.validation.constraints.NotBlank;
@@ -12,5 +13,7 @@ public record UpdateStudentRequest(
 
     @NotBlank(message = "Tên học sinh không được để trống") @Size(max = 200, message = "Tên học sinh không được vượt quá 200 ký tự") String fullName,
 
-    @NotNull(message = "Lớp học không được để trống") UUID classId
+    @NotNull(message = "Lớp học không được để trống") UUID classId,
+
+    @NotNull(message = "Ngày bắt đầu học không được để trống") LocalDate startedAt
 ) {}

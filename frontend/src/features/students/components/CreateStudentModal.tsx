@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 
 import { useCreateStudent } from "../hooks/useCreateStudent";
 
+import { todayInputValue } from "../../../common/func/common.func";
 import type { ClassSummary } from "../../classes/types/class.types";
 
 type Props = {
@@ -23,9 +24,7 @@ export function CreateStudentModal({
 
     const [classId, setClassId] = useState(selectedClassId ?? "");
 
-    const [startedAt, setStartedAt] = useState(
-        new Date().toISOString().slice(0, 10),
-    );
+    const [startedAt, setStartedAt] = useState(todayInputValue());
 
     const mutation = useCreateStudent();
 

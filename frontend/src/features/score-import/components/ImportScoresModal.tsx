@@ -17,8 +17,10 @@ import { ImportHistory } from "./ImportHistory";
 
 import { formatDate, formatScore } from "../../../common/func/common.func";
 import type {
+    ImportNewStudent,
     ImportSessionStatus,
     ImportStudent,
+    ScoreImportPreview,
 } from "../types/score-import.types";
 
 type Props = {
@@ -41,6 +43,9 @@ export function ImportScoresModal({ onClose }: Props) {
     const [isDragging, setIsDragging] = useState(false);
 
     const [expandedCode, setExpandedCode] = useState<string | null>(null);
+
+    // codes of the new students that will be added
+    const [selectedNew, setSelectedNew] = useState<Set<string>>(new Set());
 
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -70,6 +75,25 @@ export function ImportScoresModal({ onClose }: Props) {
         return groups;
     }, [preview]);
 
+    const addableNew =
+        preview?.newStudents.filter((student) => student.problem === null) ??
+        [];
+
+    const chosenNew = addableNew.filter((student) =>
+        selectedNew.has(student.studentCode),
+    );
+
+    // totals including the new students that are ticked
+    const totalStudents = (preview?.totals.students ?? 0) + chosenNew.length;
+
+    const totalNewSessions =
+        (preview?.totals.newSessions ?? 0) +
+        chosenNew.reduce((sum, student) => sum + student.newSessions, 0);
+
+    const totalStars =
+        (preview?.totals.starsToAward ?? 0) +
+        chosenNew.reduce((sum, student) => sum + student.starsToAward, 0);
+
     const errors =
         preview?.issues.filter((issue) => issue.severity === "ERROR") ?? [];
 
@@ -84,7 +108,39 @@ export function ImportScoresModal({ onClose }: Props) {
         setFile(selected);
         setExpandedCode(null);
         importMutation.reset();
-        previewMutation.mutate(selected);
+        previewMutation.mutate(selected, {
+            onSuccess: (data: ScoreImportPreview) =>
+                // every new student that can be added is ticked by default
+                setSelectedNew(
+                    new Set(
+                        data.newStudents
+                            .filter((student) => student.problem === null)
+                            .map((student) => student.studentCode),
+                    ),
+                ),
+        });
+    }
+
+    function toggleNew(studentCode: string) {
+        setSelectedNew((current) => {
+            const next = new Set(current);
+
+            if (next.has(studentCode)) {
+                next.delete(studentCode);
+            } else {
+                next.add(studentCode);
+            }
+
+            return next;
+        });
+    }
+
+    function toggleAllNew() {
+        setSelectedNew(
+            chosenNew.length === addableNew.length
+                ? new Set()
+                : new Set(addableNew.map((student) => student.studentCode)),
+        );
     }
 
     function chooseAnotherFile() {
@@ -188,6 +244,17 @@ export function ImportScoresModal({ onClose }: Props) {
                                 buổi cho <strong>{result.students}</strong> học
                                 sinh và cộng{" "}
                                 <strong>{result.awardedStars} sao</strong>.
+                                {result.createdStudents > 0 && (
+                                    <>
+                                        {" "}
+                                        Đã thêm{" "}
+                                        <strong>
+                                            {result.createdStudents} học sinh
+                                            mới
+                                        </strong>
+                                        .
+                                    </>
+                                )}
                                 {result.skippedSessions > 0 &&
                                     ` ${result.skippedSessions} buổi đã nhập trước đó được bỏ qua.`}
                             </span>
@@ -288,12 +355,12 @@ export function ImportScoresModal({ onClose }: Props) {
                         <div className="import-summary">
                             <div>
                                 <span>Học sinh</span>
-                                <strong>{preview.totals.students}</strong>
+                                <strong>{totalStudents}</strong>
                             </div>
 
                             <div>
                                 <span>Buổi mới</span>
-                                <strong>{preview.totals.newSessions}</strong>
+                                <strong>{totalNewSessions}</strong>
                             </div>
 
                             <div>
@@ -304,7 +371,7 @@ export function ImportScoresModal({ onClose }: Props) {
                             <div>
                                 <span>Sao sẽ cộng</span>
                                 <strong className="positive">
-                                    +{preview.totals.starsToAward}
+                                    +{totalStars}
                                 </strong>
                             </div>
                         </div>
@@ -346,10 +413,27 @@ export function ImportScoresModal({ onClose }: Props) {
                             </details>
                         )}
 
+                        {preview.newStudents.length > 0 && (
+                            <NewStudentsSection
+                                students={preview.newStudents}
+                                selected={selectedNew}
+                                allSelected={
+                                    addableNew.length > 0 &&
+                                    chosenNew.length === addableNew.length
+                                }
+                                canSelect={addableNew.length > 0}
+                                disabled={busy}
+                                onToggle={toggleNew}
+                                onToggleAll={toggleAllNew}
+                            />
+                        )}
+
                         {preview.students.length === 0 ? (
-                            <div className="empty-state">
-                                Không có học sinh nào khớp với hệ thống.
-                            </div>
+                            preview.newStudents.length === 0 && (
+                                <div className="empty-state">
+                                    Không có học sinh nào khớp với hệ thống.
+                                </div>
+                            )
                         ) : (
                             [...studentsByClass.entries()].map(
                                 ([classCode, students]) => (
@@ -431,24 +515,155 @@ export function ImportScoresModal({ onClose }: Props) {
                             <button
                                 type="button"
                                 disabled={
-                                    busy || preview.totals.newSessions === 0
+                                    busy ||
+                                    (totalNewSessions === 0 &&
+                                        chosenNew.length === 0)
                                 }
                                 title={
-                                    preview.totals.newSessions === 0
+                                    totalNewSessions === 0 &&
+                                    chosenNew.length === 0
                                         ? "Không có buổi điểm mới để nhập"
                                         : undefined
                                 }
-                                onClick={() => importMutation.mutate(file)}
+                                onClick={() =>
+                                    importMutation.mutate({
+                                        file,
+                                        createStudentCodes: chosenNew.map(
+                                            (student) => student.studentCode,
+                                        ),
+                                    })
+                                }
                             >
                                 {importMutation.isPending
                                     ? "Đang nhập..."
-                                    : `Nhập ${preview.totals.newSessions} buổi · +${preview.totals.starsToAward} sao`}
+                                    : `Nhập ${totalNewSessions} buổi · +${totalStars} sao${chosenNew.length > 0 ? ` · thêm ${chosenNew.length} học sinh` : ""}`}
                             </button>
                         </div>
                     </>
                 )}
             </div>
         </div>
+    );
+}
+
+type NewStudentsSectionProps = {
+    students: ImportNewStudent[];
+    selected: Set<string>;
+    allSelected: boolean;
+    canSelect: boolean;
+    disabled: boolean;
+    onToggle: (studentCode: string) => void;
+    onToggleAll: () => void;
+};
+
+function NewStudentsSection({
+    students,
+    selected,
+    allSelected,
+    canSelect,
+    disabled,
+    onToggle,
+    onToggleAll,
+}: NewStudentsSectionProps) {
+    return (
+        <section className="import-class import-new-students">
+            <h3>
+                Học sinh mới chưa có trên hệ thống
+                <span>{students.length} học sinh</span>
+            </h3>
+
+            <div className="import-new-toolbar">
+                <p className="import-formula">
+                    Tick những học sinh muốn thêm vào lớp, ngày bắt đầu học lấy
+                    từ cột "Ngày bắt đầu học" trong file.
+                </p>
+
+                {canSelect && (
+                    <button
+                        type="button"
+                        className="secondary"
+                        onClick={onToggleAll}
+                        disabled={disabled}
+                    >
+                        {allSelected ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                    </button>
+                )}
+            </div>
+
+            <div className="tableWrap">
+                <table className="import-table">
+                    <thead>
+                        <tr>
+                            <th />
+                            <th>Mã HS</th>
+                            <th>Họ tên</th>
+                            <th>Lớp</th>
+                            <th>Bắt đầu học</th>
+                            <th>Buổi</th>
+                            <th>Sao</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {students.map((student) => {
+                            const blocked = student.problem !== null;
+
+                            return (
+                                <tr
+                                    key={student.studentCode}
+                                    className={blocked ? "import-new-blocked" : ""}
+                                >
+                                    <td>
+                                        <input
+                                            type="checkbox"
+                                            checked={selected.has(
+                                                student.studentCode,
+                                            )}
+                                            disabled={blocked || disabled}
+                                            onChange={() =>
+                                                onToggle(student.studentCode)
+                                            }
+                                            aria-label={`Thêm ${student.studentCode}`}
+                                        />
+                                    </td>
+
+                                    <td>{student.studentCode}</td>
+
+                                    <td>
+                                        {student.fullName ?? "–"}
+                                        {blocked && (
+                                            <small className="import-new-problem">
+                                                {student.problem}
+                                            </small>
+                                        )}
+                                    </td>
+
+                                    <td>{student.className}</td>
+
+                                    <td>
+                                        {student.startedAt
+                                            ? formatDate(student.startedAt)
+                                            : "–"}
+                                    </td>
+
+                                    <td>{student.newSessions}</td>
+
+                                    <td>
+                                        {student.starsToAward > 0 ? (
+                                            <span className="score-stars">
+                                                +{student.starsToAward} sao
+                                            </span>
+                                        ) : (
+                                            <span className="muted">0</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </section>
     );
 }
 

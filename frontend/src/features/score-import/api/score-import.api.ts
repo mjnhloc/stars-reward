@@ -35,10 +35,20 @@ export async function previewScoreImport(
     return response.data;
 }
 
-export async function importScores(file: File): Promise<ScoreImportResult> {
+export async function importScores(
+    file: File,
+    createStudentCodes: string[],
+): Promise<ScoreImportResult> {
+    const formData = toFormData(file);
+
+    // new students of the file the user chose to add
+    createStudentCodes.forEach((code) =>
+        formData.append("createStudentCodes", code),
+    );
+
     const response = await apiClient.post<ScoreImportResult>(
         "/score-imports",
-        toFormData(file),
+        formData,
         {
             headers: { "Content-Type": "multipart/form-data" },
             timeout: UPLOAD_TIMEOUT,

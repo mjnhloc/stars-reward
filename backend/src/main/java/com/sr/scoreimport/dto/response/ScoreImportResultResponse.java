@@ -7,5 +7,6 @@ public record ScoreImportResultResponse(
     int importedSessions,
     int awardedStars,
     int students,
-    int skippedSessions
+    int skippedSessions,
+    int createdStudents
 ) {}

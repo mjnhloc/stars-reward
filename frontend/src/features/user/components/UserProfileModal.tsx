@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { ChangePasswordForm } from "../../auth/components/ChangePasswordForm";
 import type { AuthUser } from "../../auth/types/auth.types";
+import { formatRole } from "../func/role";
 
 type Props = {
     user: AuthUser;
@@ -80,20 +81,4 @@ export function UserProfileModal({ user, onClose }: Props) {
             </div>
         </div>
     );
-}
-
-function formatRole(role: string): string {
-    switch (role) {
-        case "ADMIN":
-            return "Quản trị viên";
-
-        case "TEACHER":
-            return "Giáo viên";
-
-        case "VIEWER":
-            return "Chỉ xem";
-
-        default:
-            return role;
-    }
 }

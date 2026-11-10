@@ -32,7 +32,7 @@ public class StudentScoreEntity {
     @Column(name = "student_id", nullable = false)
     private UUID studentId;
 
-    @Column(name = "class_id", nullable = false)
+    @Column(name = "class_id")
     private UUID classId;
 
     @Column(name = "homework_score", nullable = false)

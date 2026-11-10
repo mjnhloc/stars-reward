@@ -142,7 +142,8 @@ public class AuthorizationController {
         return new TokenResponse(
             accessToken.value(),
             "Bearer",
-            accessToken.expiresIn()
+            accessToken.expiresIn(),
+            rotatedRefreshToken.session().remember()
         );
     }
 

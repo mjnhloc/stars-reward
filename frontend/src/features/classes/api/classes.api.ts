@@ -2,6 +2,7 @@ import { apiClient } from "../../../lib/apiClient";
 import {
     ClassDetail,
     ClassSummary,
+    ClassTrash,
     CreateClassRequest,
     CreateClassResponse,
     UpdateClassRequest,
@@ -44,4 +45,22 @@ export async function updateClass(
 
 export async function deleteClass(classId: string): Promise<void> {
     await apiClient.delete(`/classes/${classId}`);
+}
+
+export async function getClassTrash(): Promise<ClassTrash[]> {
+    const response = await apiClient.get<ClassTrash[]>("/classes/trash");
+
+    return response.data;
+}
+
+export async function restoreClass(classId: string): Promise<ClassDetail> {
+    const response = await apiClient.post<ClassDetail>(
+        `/classes/${classId}/restore`,
+    );
+
+    return response.data;
+}
+
+export async function deleteClassPermanently(classId: string): Promise<void> {
+    await apiClient.delete(`/classes/${classId}/permanent`);
 }

@@ -1,9 +1,10 @@
-import { Star } from "lucide-react";
 import { useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 
+import logo from "../../assets/khai-minh-logo.png";
 import { logoutRequest } from "../../features/auth/api/auth.api";
 import { useAuth } from "../../features/auth/hooks/useAuth";
+import { UserManagementModal } from "../../features/user/components/UserManagementModal";
 import { UserMenu } from "../../features/user/components/UserMenu";
 import { UserProfileModal } from "../../features/user/components/UserProfileModal";
 
@@ -13,6 +14,7 @@ export function AppLayout() {
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isUsersOpen, setIsUsersOpen] = useState(false);
 
     async function handleLogout() {
         try {
@@ -31,9 +33,9 @@ export function AppLayout() {
         <div className="app-shell">
             <header className="app-header">
                 <div className="brand">
-                    <Star aria-hidden="true" />
+                    <img src={logo} alt="Khai Minh" className="brand-logo" />
 
-                    <div>
+                    <div className="brand-product">
                         <strong>Stars Reward</strong>
                         <small>Quản lí điểm thưởng học sinh</small>
                     </div>
@@ -48,6 +50,14 @@ export function AppLayout() {
                         setIsMenuOpen(false);
                         setIsProfileOpen(true);
                     }}
+                    onManageUsersClick={
+                        user.role === "ADMIN"
+                            ? () => {
+                                  setIsMenuOpen(false);
+                                  setIsUsersOpen(true);
+                              }
+                            : undefined
+                    }
                     onLogout={handleLogout}
                 />
             </header>
@@ -58,6 +68,13 @@ export function AppLayout() {
                 <UserProfileModal
                     user={user}
                     onClose={() => setIsProfileOpen(false)}
+                />
+            )}
+
+            {isUsersOpen && (
+                <UserManagementModal
+                    currentUserId={user.id}
+                    onClose={() => setIsUsersOpen(false)}
                 />
             )}
         </div>

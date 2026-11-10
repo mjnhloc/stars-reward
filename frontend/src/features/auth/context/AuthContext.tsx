@@ -5,7 +5,7 @@ import {
     useState,
     type ReactNode,
 } from "react";
-import { getCurrentUser } from "../api/auth.api";
+import { getCurrentUser, refreshAccessToken } from "../api/auth.api";
 import { tokenStorage } from "../services/tokenStorage";
 import type { AuthUser } from "../types/auth.types";
 
@@ -33,14 +33,18 @@ export function AuthProvider({
     const [isInitializing, setIsInitializing] = useState(true);
 
     useEffect(() => {
-        const accessToken = tokenStorage.getFromAnyStorage();
+        /*
+         * A new tab or a reopened browser has no access token yet, but the
+         * refresh cookie may still be valid, so try it before showing login
+         */
+        const ensureAccessToken = tokenStorage.getFromAnyStorage()
+            ? Promise.resolve()
+            : refreshAccessToken().then((refreshed) =>
+                  tokenStorage.set(refreshed.accessToken, refreshed.remember),
+              );
 
-        if (!accessToken) {
-            setIsInitializing(false);
-            return;
-        }
-
-        getCurrentUser()
+        ensureAccessToken
+            .then(getCurrentUser)
             .then(setUser)
             .catch(() => {
                 tokenStorage.clear();

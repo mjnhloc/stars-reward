@@ -7,6 +7,7 @@ public record ScoreImportPreviewResponse(
     String sheetName,
     List<ImportClassResponse> classes,
     List<ImportStudentResponse> students,
+    List<ImportNewStudentResponse> newStudents,
     ImportTotalsResponse totals,
     List<ImportIssueResponse> issues
 ) {}

@@ -6,7 +6,13 @@ export function useImportScores() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (file: File) => importScores(file),
+        mutationFn: ({
+            file,
+            createStudentCodes,
+        }: {
+            file: File;
+            createStudentCodes: string[];
+        }) => importScores(file, createStudentCodes),
 
         onSuccess: () => {
             queryClient.invalidateQueries({

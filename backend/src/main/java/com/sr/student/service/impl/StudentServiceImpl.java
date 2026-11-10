@@ -2,6 +2,7 @@ package com.sr.student.service.impl;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,8 +20,10 @@ import com.sr.classes.entity.ClassEntity;
 import com.sr.classes.repository.ClassRepository;
 import com.sr.common.audit.dto.AuditLogCommand;
 import com.sr.common.audit.service.AuditLogService;
+import com.sr.reward.repository.RewardRedemptionRepository;
 import com.sr.reward.service.RewardCalculationService;
 import com.sr.student.dto.request.CreateStudentRequest;
+import com.sr.student.dto.request.RestoreStudentRequest;
 import com.sr.student.dto.request.StudentStarsAdjustmentRequest;
 import com.sr.student.dto.request.UpdateStudentRequest;
 import com.sr.student.dto.response.StudentResponse;
@@ -28,6 +31,7 @@ import com.sr.student.dto.response.StudentScoreResponse;
 import com.sr.student.dto.response.StudentStarsAdjustmentResponse;
 import com.sr.student.dto.response.StudentSummary;
 import com.sr.student.dto.response.StudentTransactionResponse;
+import com.sr.student.dto.response.StudentTrashResponse;
 import com.sr.student.entity.ClassEnrollmentEntity;
 import com.sr.student.entity.StarTransactionEntity;
 import com.sr.student.entity.StudentEntity;
@@ -43,12 +47,15 @@ import com.sr.user.service.UserService;
 @Service
 public class StudentServiceImpl implements StudentService {
 
+    private static final DateTimeFormatter DISPLAY_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
     private final StudentRepository studentRepository;
     private final ClassRepository classRepository;
     private final ClassEnrollmentRepository classEnrollmentRepository;
     private final StudentStarBalanceRepository studentStarBalanceRepository;
     private final StarTransactionRepository starTransactionRepository;
     private final StudentScoreRepository studentScoreRepository;
+    private final RewardRedemptionRepository rewardRedemptionRepository;
     private final AuthorizationService auth;
     private final RewardCalculationService rewardCalculationService;
     private final AuditLogService auditLogService;
@@ -61,6 +68,7 @@ public class StudentServiceImpl implements StudentService {
         StudentStarBalanceRepository studentStarBalanceRepository,
         StarTransactionRepository starTransactionRepository,
         StudentScoreRepository studentScoreRepository,
+        RewardRedemptionRepository rewardRedemptionRepository,
         AuthorizationService auth,
         RewardCalculationService rcs,
         AuditLogService auditLogService,
@@ -72,6 +80,7 @@ public class StudentServiceImpl implements StudentService {
         this.studentStarBalanceRepository = studentStarBalanceRepository;
         this.starTransactionRepository = starTransactionRepository;
         this.studentScoreRepository = studentScoreRepository;
+        this.rewardRedemptionRepository = rewardRedemptionRepository;
         this.auth = auth;
         this.rewardCalculationService = rcs;
         this.auditLogService = auditLogService;
@@ -102,7 +111,8 @@ public class StudentServiceImpl implements StudentService {
                 totalStars,
                 rewardCalculationService.calculateRedeemableStars(totalStars),
                 rewardCalculationService.calculateRedeemableValue(totalStars),
-                rewardCalculationService.calculateRemainingStars(totalStars)
+                rewardCalculationService.calculateRemainingStars(totalStars),
+                student.startedAt()
             );
         }).toList();
     }
@@ -344,7 +354,8 @@ public class StudentServiceImpl implements StudentService {
             normalizedFullName,
             request.classId(),
             className,
-            0
+            0,
+            startedAt
         );
     }
 
@@ -377,6 +388,12 @@ public class StudentServiceImpl implements StudentService {
             .orElseThrow(() -> new IllegalArgumentException("Học sinh hiện không thuộc lớp nào"));
 
         UUID fromClassId = currentEnrollment.getClassId();
+        LocalDate fromStartedAt = currentEnrollment.getStartedAt();
+        LocalDate startedAt = request.startedAt();
+
+        if (startedAt.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("Ngày bắt đầu học không được sau hôm nay");
+        }
 
         Map<String, Object> details = new HashMap<>();
         details.put(
@@ -387,7 +404,9 @@ public class StudentServiceImpl implements StudentService {
                 "fullName",
                 student.getFullName(),
                 "classId",
-                fromClassId.toString()
+                fromClassId.toString(),
+                "startedAt",
+                fromStartedAt.toString()
             )
         );
         details.put(
@@ -398,7 +417,9 @@ public class StudentServiceImpl implements StudentService {
                 "fullName",
                 normalizedFullName,
                 "classId",
-                request.classId().toString()
+                request.classId().toString(),
+                "startedAt",
+                startedAt.toString()
             )
         );
 
@@ -411,32 +432,41 @@ public class StudentServiceImpl implements StudentService {
             throw new IllegalArgumentException("Mã học sinh đã tồn tại");
         }
 
-        /*
-         * Move student to another class
-         */
-        if (!fromClassId.equals(request.classId())) {
-            LocalDate today = LocalDate.now();
+        boolean classChanged = !fromClassId.equals(request.classId());
 
-            if (today.equals(currentEnrollment.getStartedAt())) {
-                /*
-                 * Enrollment started today, only correct the class (no history needed)
-                 */
-                currentEnrollment.setClassId(request.classId());
-            } else {
-                /*
-                 * End the current enrollment and flush before inserting the new one, so
-                 * that the unique index on active enrollment is never violated
-                 */
-                currentEnrollment.setEndedAt(today);
-                classEnrollmentRepository.saveAndFlush(currentEnrollment);
+        if (classChanged && startedAt.isAfter(fromStartedAt)) {
+            /*
+             * Move student to another class from the chosen date. End the current
+             * enrollment and flush before inserting the new one, so that the unique
+             * index on active enrollment is never violated
+             */
+            currentEnrollment.setEndedAt(startedAt);
+            classEnrollmentRepository.saveAndFlush(currentEnrollment);
 
-                ClassEnrollmentEntity newEnrollment = classEnrollmentRepository.save(
-                    ClassEnrollmentEntity.create(request.classId(), studentId, today)
-                );
+            ClassEnrollmentEntity newEnrollment = ClassEnrollmentEntity.create(request.classId(), studentId, startedAt);
+            saveEnrollment(newEnrollment);
 
-                details.put("newEnrollmentId", newEnrollment.getId().toString());
-            }
+            details.put("newEnrollmentId", newEnrollment.getId().toString());
+        } else if (classChanged || !startedAt.equals(fromStartedAt)) {
+            /*
+             * Correct the current enrollment (wrong class from its start, or wrong start
+             * date), no history needed. It cannot start before the previous one ended
+             */
+            classEnrollmentRepository.findFirstByStudentIdAndEndedAtIsNotNullOrderByEndedAtDesc(studentId)
+                .filter(previous -> startedAt.isBefore(previous.getEndedAt()))
+                .ifPresent(previous -> {
+                    throw new IllegalArgumentException(
+                        "Ngày bắt đầu học không được trước ngày học sinh rời lớp trước (%s)"
+                            .formatted(DISPLAY_DATE.format(previous.getEndedAt()))
+                    );
+                });
 
+            currentEnrollment.setClassId(request.classId());
+            currentEnrollment.setStartedAt(startedAt);
+            saveEnrollment(currentEnrollment);
+        }
+
+        if (classChanged) {
             details.put("fromClassId", fromClassId.toString());
             details.put("toClassId", request.classId().toString());
         }
@@ -461,7 +491,8 @@ public class StudentServiceImpl implements StudentService {
             normalizedFullName,
             request.classId(),
             className,
-            totalStars
+            totalStars,
+            startedAt
         );
     }
 
@@ -509,5 +540,143 @@ public class StudentServiceImpl implements StudentService {
                 details
             )
         );
+    }
+
+    /*
+     * Function to list deleted students (the trash), newest first
+     */
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional(readOnly = true)
+    public List<StudentTrashResponse> getStudentTrash() {
+        return studentRepository.findTrash();
+    }
+
+    /*
+     * Function to restore a deleted student with the stars it had. The student goes
+     * back to its old class, or to the chosen class when the old one was deleted
+     */
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public StudentSummary restoreStudent(UUID studentId, RestoreStudentRequest request) {
+        UUID actorId = userService.getUserId();
+
+        StudentEntity student = studentRepository.findArchivedForUpdate(studentId)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy học sinh trong thùng rác"));
+
+        ClassEnrollmentEntity lastEnrollment = classEnrollmentRepository.findFirstByStudentIdOrderByStartedAtDesc(studentId)
+            .orElse(null);
+
+        UUID lastClassId = lastEnrollment == null ? null : lastEnrollment.getClassId();
+        UUID classId = request != null && request.classId() != null ? request.classId() : lastClassId;
+
+        if (classId == null) {
+            throw new IllegalArgumentException("Hãy chọn lớp để khôi phục học sinh");
+        }
+
+        ClassEntity classEntity = classRepository.findByIdAndArchivedAtIsNull(classId)
+            .orElseThrow(() -> new IllegalArgumentException(
+                classId.equals(lastClassId)
+                    ? "Lớp cũ của học sinh đã bị xóa, hãy chọn lớp khác hoặc khôi phục lớp trước"
+                    : "Không tìm thấy lớp học"
+            ));
+
+        LocalDate startedAt;
+
+        if (classId.equals(lastClassId)) {
+            /*
+             * Back to the old class: continue the old enrollment
+             */
+            lastEnrollment.setEndedAt(null);
+            startedAt = lastEnrollment.getStartedAt();
+        } else {
+            startedAt = LocalDate.now();
+            saveEnrollment(ClassEnrollmentEntity.create(classId, studentId, startedAt));
+        }
+
+        student.setArchivedAt(null);
+
+        int totalStars = studentStarBalanceRepository.findById(studentId)
+            .map(StudentStarBalanceEntity::getTotalStars)
+            .orElse(0);
+
+        auditLogService.record(
+            new AuditLogCommand(
+                actorId,
+                "STUDENT_RESTORED",
+                "STUDENT",
+                studentId,
+                Map.of(
+                    "studentCode",
+                    student.getStudentCode(),
+                    "classId",
+                    classId.toString(),
+                    "totalStars",
+                    totalStars
+                )
+            )
+        );
+
+        return new StudentSummary(
+            studentId,
+            student.getStudentCode(),
+            student.getFullName(),
+            classId,
+            classEntity.getName(),
+            totalStars,
+            startedAt
+        );
+    }
+
+    /*
+     * Function to permanently delete a student in the trash with all of its
+     * history: star transactions, redemptions, scores, balance and enrollments
+     */
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public void deleteStudentPermanently(UUID studentId) {
+        UUID actorId = userService.getUserId();
+
+        StudentEntity student = studentRepository.findArchivedForUpdate(studentId)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy học sinh trong thùng rác"));
+
+        Map<String, Object> details = new HashMap<>();
+        details.put("studentCode", student.getStudentCode());
+        details.put("fullName", student.getFullName());
+
+        /*
+         * Order matters because of the foreign keys: transactions point to
+         * redemptions and scores
+         */
+        details.put("transactions", starTransactionRepository.deleteAllOfStudent(studentId));
+        details.put("redemptions", rewardRedemptionRepository.deleteAllOfStudent(studentId));
+        details.put("scores", studentScoreRepository.deleteAllOfStudent(studentId));
+        studentStarBalanceRepository.deleteOfStudent(studentId);
+        classEnrollmentRepository.deleteAllOfStudent(studentId);
+        studentRepository.deletePermanently(studentId);
+
+        auditLogService.record(
+            new AuditLogCommand(
+                actorId,
+                "STUDENT_DELETED_PERMANENTLY",
+                "STUDENT",
+                studentId,
+                details
+            )
+        );
+    }
+
+    /*
+     * Save an enrollment right away, so that a second enrollment of the student in
+     * the same class with the same start date is reported clearly
+     */
+    private void saveEnrollment(ClassEnrollmentEntity enrollment) {
+        try {
+            classEnrollmentRepository.saveAndFlush(enrollment);
+        } catch (DataIntegrityViolationException exception) {
+            throw new IllegalArgumentException("Học sinh đã có một lần vào lớp này với cùng ngày bắt đầu");
+        }
     }
 }

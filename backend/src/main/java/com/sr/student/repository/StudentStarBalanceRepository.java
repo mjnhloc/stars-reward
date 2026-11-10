@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -40,4 +41,8 @@ public interface StudentStarBalanceRepository extends JpaRepository<StudentStarB
         WHERE s.archivedAt IS NULL
         """)
     DashboardResponse getDashboardSummary();
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "DELETE FROM student_star_balances WHERE student_id = :studentId", nativeQuery = true)
+    int deleteOfStudent(@Param("studentId") UUID studentId);
 }

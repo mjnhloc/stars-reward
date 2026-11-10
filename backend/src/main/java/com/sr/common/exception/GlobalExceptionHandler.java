@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -46,6 +47,32 @@ public class GlobalExceptionHandler {
             HttpStatus.BAD_REQUEST.value(),
             "INVALID_REQUEST",
             exception.getMessage(),
+            request.getRequestURI(),
+            OffsetDateTime.now()
+        );
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /*
+     * Bean validation of a request body, show the first message
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiErrorResponse> handleValidation(
+        MethodArgumentNotValidException exception,
+        HttpServletRequest request
+    ) {
+        String message = exception.getBindingResult()
+            .getAllErrors()
+            .stream()
+            .findFirst()
+            .map(error -> error.getDefaultMessage())
+            .orElse("Dữ liệu không hợp lệ");
+
+        ApiErrorResponse response = new ApiErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            "INVALID_REQUEST",
+            message,
             request.getRequestURI(),
             OffsetDateTime.now()
         );

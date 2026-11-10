@@ -21,6 +21,20 @@ export type ImportStudent = {
     sessions: ImportSession[];
 };
 
+// a student of the file that is not on the system, added only when ticked
+export type ImportNewStudent = {
+    studentCode: string;
+    fullName: string | null;
+    startedAt: string | null;
+    classCode: string;
+    className: string;
+    newSessions: number;
+    starsToAward: number;
+    sessions: ImportSession[];
+    // why it cannot be added, null when it can
+    problem: string | null;
+};
+
 export type ImportClass = {
     classCode: string;
     className: string | null;
@@ -39,6 +53,7 @@ export type ScoreImportPreview = {
     sheetName: string;
     classes: ImportClass[];
     students: ImportStudent[];
+    newStudents: ImportNewStudent[];
     totals: {
         students: number;
         newSessions: number;
@@ -55,6 +70,7 @@ export type ScoreImportResult = {
     awardedStars: number;
     students: number;
     skippedSessions: number;
+    createdStudents: number;
 };
 
 export type ImportBatchStatus = "COMPLETED" | "REVERTED";

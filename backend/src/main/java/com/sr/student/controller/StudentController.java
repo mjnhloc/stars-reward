@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sr.reward.service.RewardCalculationService;
 import com.sr.student.dto.request.CreateStudentRequest;
+import com.sr.student.dto.request.RestoreStudentRequest;
 import com.sr.student.dto.request.StudentStarsAdjustmentRequest;
 import com.sr.student.dto.request.UpdateStudentRequest;
 import com.sr.student.dto.response.StudentResponse;
@@ -25,6 +26,7 @@ import com.sr.student.dto.response.StudentScoreResponse;
 import com.sr.student.dto.response.StudentStarsAdjustmentResponse;
 import com.sr.student.dto.response.StudentSummary;
 import com.sr.student.dto.response.StudentTransactionResponse;
+import com.sr.student.dto.response.StudentTrashResponse;
 import com.sr.student.service.StudentService;
 import com.sr.user.service.UserService;
 
@@ -54,6 +56,11 @@ public class StudentController {
         String query
     ) {
         return studentService.getStudents(classId, query);
+    }
+
+    @GetMapping("/trash")
+    public List<StudentTrashResponse> getStudentTrash() {
+        return studentService.getStudentTrash();
     }
 
     @GetMapping("/{studentId}/transactions")
@@ -114,5 +121,24 @@ public class StudentController {
         UUID studentId
     ) {
         studentService.deleteStudent(studentId);
+    }
+
+    @PostMapping("/{studentId}/restore")
+    public StudentSummary restoreStudent(
+        @PathVariable
+        UUID studentId,
+        @RequestBody(required = false)
+        RestoreStudentRequest request
+    ) {
+        return studentService.restoreStudent(studentId, request);
+    }
+
+    @DeleteMapping("/{studentId}/permanent")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteStudentPermanently(
+        @PathVariable
+        UUID studentId
+    ) {
+        studentService.deleteStudentPermanently(studentId);
     }
 }

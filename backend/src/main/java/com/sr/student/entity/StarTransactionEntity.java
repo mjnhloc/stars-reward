@@ -13,10 +13,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 /*
  * Ledger rows are immutable: Hibernate only inserts, never updates them.
@@ -38,7 +38,7 @@ public class StarTransactionEntity {
     @Column(name = "student_id", nullable = false)
     private UUID studentId;
 
-    @Column(name = "class_id", nullable = false)
+    @Column(name = "class_id")
     private UUID classId;
 
     @Column(name = "redemption_id")

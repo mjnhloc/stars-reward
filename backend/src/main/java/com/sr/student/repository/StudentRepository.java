@@ -8,10 +8,12 @@ import java.util.UUID;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.sr.student.dto.response.StudentSummary;
+import com.sr.student.dto.response.StudentTrashResponse;
 import com.sr.student.entity.StudentEntity;
 
 import jakarta.persistence.LockModeType;
@@ -28,7 +30,8 @@ public interface StudentRepository extends JpaRepository<StudentEntity, UUID> {
             s.fullName,
             c.id,
             c.name,
-            COALESCE(b.totalStars, 0)
+            COALESCE(b.totalStars, 0),
+            e.startedAt
         )
         FROM StudentEntity s
         JOIN ClassEnrollmentEntity e
@@ -60,7 +63,8 @@ public interface StudentRepository extends JpaRepository<StudentEntity, UUID> {
             s.fullName,
             c.id,
             c.name,
-            COALESCE(b.totalStars, 0)
+            COALESCE(b.totalStars, 0),
+            e.startedAt
         )
         FROM StudentEntity s
         JOIN ClassEnrollmentEntity e
@@ -106,4 +110,54 @@ public interface StudentRepository extends JpaRepository<StudentEntity, UUID> {
     List<StudentEntity> findByStudentCodeIn(Collection<String> studentCodes);
 
     boolean existsByStudentCodeAndIdNot(String studentCode, UUID id);
+
+    /*
+     * Deleted students with the class of their latest enrollment, newest first
+     */
+    @Query("""
+        SELECT new com.sr.student.dto.response.StudentTrashResponse(
+            s.id,
+            s.studentCode,
+            s.fullName,
+            c.id,
+            c.name,
+            CASE WHEN c.archivedAt IS NULL THEN false ELSE true END,
+            s.archivedAt,
+            COALESCE(b.totalStars, 0)
+        )
+        FROM StudentEntity s
+        LEFT JOIN ClassEnrollmentEntity e
+            ON e.studentId = s.id
+        LEFT JOIN ClassEntity c
+            ON c.id = e.classId
+        LEFT JOIN StudentStarBalanceEntity b
+            ON b.studentId = s.id
+        WHERE s.archivedAt IS NOT NULL
+            AND (
+                e.id IS NULL
+                OR e.startedAt = (
+                    SELECT MAX(e2.startedAt)
+                    FROM ClassEnrollmentEntity e2
+                    WHERE e2.studentId = s.id
+                )
+            )
+        ORDER BY s.archivedAt DESC
+        """)
+    List<StudentTrashResponse> findTrash();
+
+    /*
+     * SELECT ... FOR UPDATE of a student in the trash
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT s
+        FROM StudentEntity s
+        WHERE s.id = :studentId
+            AND s.archivedAt IS NOT NULL
+        """)
+    Optional<StudentEntity> findArchivedForUpdate(@Param("studentId") UUID studentId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "DELETE FROM students WHERE id = :studentId", nativeQuery = true)
+    int deletePermanently(@Param("studentId") UUID studentId);
 }

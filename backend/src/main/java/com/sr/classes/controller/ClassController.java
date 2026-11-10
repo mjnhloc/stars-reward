@@ -18,6 +18,7 @@ import com.sr.classes.dto.request.CreateClassRequest;
 import com.sr.classes.dto.request.UpdateClassRequest;
 import com.sr.classes.dto.response.ClassDetailResponse;
 import com.sr.classes.dto.response.ClassResponse;
+import com.sr.classes.dto.response.ClassTrashResponse;
 import com.sr.classes.dto.response.CreateClassResponse;
 import com.sr.classes.service.ClassService;
 
@@ -36,6 +37,11 @@ public class ClassController {
     @GetMapping
     public List<ClassResponse> getClasses() {
         return classService.getClasses();
+    }
+
+    @GetMapping("/trash")
+    public List<ClassTrashResponse> getClassTrash() {
+        return classService.getClassTrash();
     }
 
     @GetMapping("/{classId}")
@@ -76,4 +82,20 @@ public class ClassController {
         classService.deleteClass(classId);
     }
 
+    @PostMapping("/{classId}/restore")
+    public ClassDetailResponse restoreClass(
+        @PathVariable
+        UUID classId
+    ) {
+        return classService.restoreClass(classId);
+    }
+
+    @DeleteMapping("/{classId}/permanent")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteClassPermanently(
+        @PathVariable
+        UUID classId
+    ) {
+        classService.deleteClassPermanently(classId);
+    }
 }

@@ -3,7 +3,9 @@ package com.sr.classes.service.impl;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,13 +16,19 @@ import com.sr.classes.dto.request.CreateClassRequest;
 import com.sr.classes.dto.request.UpdateClassRequest;
 import com.sr.classes.dto.response.ClassDetailResponse;
 import com.sr.classes.dto.response.ClassResponse;
+import com.sr.classes.dto.response.ClassTrashResponse;
 import com.sr.classes.dto.response.CreateClassResponse;
 import com.sr.classes.entity.ClassEntity;
 import com.sr.classes.repository.ClassRepository;
+import com.sr.classes.repository.ClassUserAssignmentRepository;
 import com.sr.classes.service.ClassService;
 import com.sr.common.audit.dto.AuditLogCommand;
 import com.sr.common.audit.service.AuditLogService;
+import com.sr.student.dto.response.StudentTrashResponse;
 import com.sr.student.repository.ClassEnrollmentRepository;
+import com.sr.student.repository.StarTransactionRepository;
+import com.sr.student.repository.StudentRepository;
+import com.sr.student.repository.StudentScoreRepository;
 import com.sr.user.service.UserService;
 
 @Service
@@ -28,17 +36,29 @@ public class ClassServiceImpl implements ClassService {
 
     private final ClassRepository classRepository;
     private final ClassEnrollmentRepository classEnrollmentRepository;
+    private final ClassUserAssignmentRepository classUserAssignmentRepository;
+    private final StudentRepository studentRepository;
+    private final StudentScoreRepository studentScoreRepository;
+    private final StarTransactionRepository starTransactionRepository;
     private final UserService userService;
     private final AuditLogService auditLogService;
 
     public ClassServiceImpl(
         ClassRepository classRepository,
         ClassEnrollmentRepository classEnrollmentRepository,
+        ClassUserAssignmentRepository classUserAssignmentRepository,
+        StudentRepository studentRepository,
+        StudentScoreRepository studentScoreRepository,
+        StarTransactionRepository starTransactionRepository,
         UserService userService,
         AuditLogService auditLogService
     ) {
         this.classRepository = classRepository;
         this.classEnrollmentRepository = classEnrollmentRepository;
+        this.classUserAssignmentRepository = classUserAssignmentRepository;
+        this.studentRepository = studentRepository;
+        this.studentScoreRepository = studentScoreRepository;
+        this.starTransactionRepository = starTransactionRepository;
         this.userService = userService;
         this.auditLogService = auditLogService;
     }
@@ -215,6 +235,117 @@ public class ClassServiceImpl implements ClassService {
                     "name",
                     classEntity.getName()
                 )
+            )
+        );
+    }
+
+    /*
+     * list deleted classes (the trash) with the number of deleted students whose
+     * last class is this one
+     */
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional(readOnly = true)
+    public List<ClassTrashResponse> getClassTrash() {
+        Map<UUID, Long> studentsByClass = studentRepository.findTrash()
+            .stream()
+            .map(StudentTrashResponse::lastClassId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
+
+        return classRepository.findByArchivedAtIsNotNullOrderByArchivedAtDesc()
+            .stream()
+            .map(classEntity -> new ClassTrashResponse(
+                classEntity.getId(),
+                classEntity.getCode(),
+                classEntity.getName(),
+                classEntity.getSchoolYear(),
+                classEntity.getArchivedAt(),
+                studentsByClass.getOrDefault(classEntity.getId(), 0L).intValue()
+            ))
+            .toList();
+    }
+
+    /*
+     * restore a deleted class, its students stay in the trash until restored
+     */
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public ClassDetailResponse restoreClass(UUID classId) {
+        UUID actorId = userService.getUserId();
+
+        ClassEntity classEntity = classRepository.findArchivedForUpdate(classId)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lớp trong thùng rác"));
+
+        classEntity.setArchivedAt(null);
+
+        auditLogService.record(
+            new AuditLogCommand(
+                actorId,
+                "CLASS_RESTORED",
+                "CLASS",
+                classId,
+                Map.of(
+                    "code",
+                    classEntity.getCode(),
+                    "name",
+                    classEntity.getName()
+                )
+            )
+        );
+
+        return toDetailResponse(classEntity);
+    }
+
+    /*
+     * permanently delete a class in the trash. Its own students must be restored
+     * or permanently deleted first. Students who moved to another class keep their
+     * old scores and stars, only without the class name
+     */
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public void deleteClassPermanently(UUID classId) {
+        UUID actorId = userService.getUserId();
+
+        ClassEntity classEntity = classRepository.findArchivedForUpdate(classId)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lớp trong thùng rác"));
+
+        long trashStudents = studentRepository.findTrash()
+            .stream()
+            .filter(student -> classId.equals(student.lastClassId()))
+            .count();
+
+        if (trashStudents > 0) {
+            throw new IllegalArgumentException(
+                "Thùng rác còn " + trashStudents
+                    + " học sinh của lớp này, hãy khôi phục hoặc xóa vĩnh viễn các học sinh đó trước"
+            );
+        }
+
+        Map<String, Object> details = Map.of(
+            "code",
+            classEntity.getCode(),
+            "name",
+            classEntity.getName(),
+            "detachedTransactions",
+            starTransactionRepository.detachClass(classId),
+            "detachedScores",
+            studentScoreRepository.detachClass(classId)
+        );
+
+        classEnrollmentRepository.deleteAllOfClass(classId);
+        classUserAssignmentRepository.deleteAllOfClass(classId);
+        classRepository.deletePermanently(classId);
+
+        auditLogService.record(
+            new AuditLogCommand(
+                actorId,
+                "CLASS_DELETED_PERMANENTLY",
+                "CLASS",
+                classId,
+                details
             )
         );
     }

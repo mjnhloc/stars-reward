@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -31,4 +32,8 @@ public interface RewardRedemptionRepository extends JpaRepository<RewardRedempti
         WHERE t.idempotencyKey = :idempotencyKey
         """)
     Optional<RewardRedemptionResponse> findByIdempotencyKey(@Param("idempotencyKey") String idempotencyKey);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "DELETE FROM reward_redemptions WHERE student_id = :studentId", nativeQuery = true)
+    int deleteAllOfStudent(@Param("studentId") UUID studentId);
 }

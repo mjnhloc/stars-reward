@@ -50,4 +50,15 @@ public class UserEntity {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
+
+    public static UserEntity create(String displayName, String email, String passwordHash, String role) {
+        UserEntity user = new UserEntity();
+        user.id = UUID.randomUUID();
+        user.displayName = displayName;
+        user.email = email;
+        user.passwordHash = passwordHash;
+        user.role = role;
+        user.active = true;
+        return user;
+    }
 }

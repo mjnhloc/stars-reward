@@ -46,9 +46,11 @@ public class ScoreImportController {
     @ResponseStatus(HttpStatus.CREATED)
     public ScoreImportResultResponse importScores(
         @RequestParam("file")
-        MultipartFile file
+        MultipartFile file,
+        @RequestParam(value = "createStudentCodes", required = false)
+        List<String> createStudentCodes
     ) {
-        return scoreImportService.importScores(file);
+        return scoreImportService.importScores(file, createStudentCodes);
     }
 
     @GetMapping
